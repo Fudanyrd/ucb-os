@@ -6,6 +6,9 @@ but realistic enough to understand OS in depth (it can run on x86 machine and si
 including QEMU, Bochs and VMWare Player!). The main source code, documentation and assignments 
 are developed by Ben Pfaff and others from Stanford (refer to its [LICENSE](./LICENSE)).
 
+## Resources
+[homepage](https://pkuflyingpig.gitbook.io/pintos/getting-started/pintos-world)
+
 ## Acknowledgement
 This source code is adapted from professor ([Ryan Huang](huang@cs.jhu.edu)) at JHU, who also taught a similar undergraduate OS course. He made some changes to the original
 Pintos labs (add lab0 and fix some bugs for MacOS). For students in PKU, please
