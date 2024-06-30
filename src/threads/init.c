@@ -134,6 +134,42 @@ pintos_init (void)
     run_actions (argv);
   } else {
     // TODO: no command line passed to kernel. Run interactively 
+    char buf[256];
+    uint8_t ch;
+    int end;
+
+    while (1) {
+      end = 0;
+      printf ("PKUOS>");
+
+      // getline
+      while (1) {
+        ch = input_getc ();
+        printf ("%c", ch);
+        if (ch == ' ') {
+          continue;
+        }
+        if (ch == '\n' || ch == '\r') {
+          buf[end] = '\0';
+          break;
+        } else {
+          buf[end] = ch;
+        }
+        ++end;
+      }
+      printf("\n");
+
+      if (strcmp(buf, "whoami") == 0) {
+        printf ("Fudanyrd <3096842671@qq.com>\n");
+        continue;
+      }
+      if (strcmp (buf, "exit") == 0) {
+        printf("Bye.\n");
+        break;
+      } else {
+        printf ("invalid command\n");
+      }
+    }
   }
 
   /* Finish up. */
