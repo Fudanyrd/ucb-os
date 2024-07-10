@@ -28,6 +28,9 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+/** List of all sleeping processes. */
+static struct list sleep_list;
+
 /** Idle thread. */
 static struct thread *idle_thread;
 
@@ -92,6 +95,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&sleep_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -117,11 +121,45 @@ thread_start (void)
   sema_down (&idle_started);
 }
 
+/** On timer interrupt, try waking up sleeping threads */
+static void
+thread_try_wakeup()
+{
+  /* check empty list */
+  if (list_empty(&sleep_list)) {
+    return;
+  }
+
+  /* list traversal */
+  struct list_elem *e;
+  struct list_elem *next;
+  struct thread *cur;
+
+  for (e = list_begin(&sleep_list); e != list_end (&sleep_list); ) {
+    cur = list_entry (e, struct thread, elem); 
+    next = list_next(e);
+
+    if (cur->ticks == 0) {
+      /* put back to running thread */
+      list_remove (e);
+      list_push_back (&ready_list, e);
+    } else {
+      cur->ticks -= 1;
+    }
+
+    /* prepare for next loop */
+    e = next;
+  }
+}
+
 /** Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
 void
 thread_tick (void) 
 {
+  /* try waking up some threads */
+  thread_try_wakeup();
+
   struct thread *t = thread_current ();
 
   /* Update statistics. */
@@ -375,7 +413,7 @@ thread_get_recent_cpu (void)
   /* Not yet implemented. */
   return 0;
 }
-
+
 /** Idle thread.  Executes when no other thread is ready to run.
 
    The idle thread is initially put on the ready list by
@@ -424,7 +462,7 @@ kernel_thread (thread_func *function, void *aux)
   function (aux);       /**< Execute the thread function. */
   thread_exit ();       /**< If function() returns, kill the thread. */
 }
-
+
 /** Returns the running thread. */
 struct thread *
 running_thread (void) 
@@ -578,7 +616,39 @@ allocate_tid (void)
 
   return tid;
 }
-
+
 /** Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+/** Sleep the thread, if ticks <= 0, return immediately. */
+void 
+thread_sleep(int64_t ticks) 
+{
+  if (ticks <= 0) {
+    return;
+  }
+
+  struct thread *cur = thread_current();
+
+  /* do not sleep the idle_thread */
+  if (cur == idle_thread) {
+    return;
+  }
+
+  /* set ticks of current running thread */
+  cur->ticks = ticks;
+  cur->status = THREAD_READY;
+
+  /* mock the process of yielding the cpu, but put
+     current thread in the sleep list! */
+  enum intr_level old_level;
+  
+  ASSERT (!intr_context ());
+
+  old_level = intr_disable ();
+  list_remove (&cur->elem);
+  list_push_back (&sleep_list, &cur->elem);
+  schedule ();
+  intr_set_level (old_level);
+}
