@@ -89,7 +89,13 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
-  thread_sleep(ticks);
+  /* check invalid argument */
+  if (ticks <= 0) {
+    return;
+  }
+
+  /* make the thread wake up after "ticks" */
+  thread_sleep (ticks + timer_ticks ());
 }
 
 /** Sleeps for approximately MS milliseconds.  Interrupts must be

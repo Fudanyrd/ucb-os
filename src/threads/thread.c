@@ -4,6 +4,7 @@
 #include <random.h>
 #include <stdio.h>
 #include <string.h>
+#include "devices/timer.h"
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
@@ -143,13 +144,12 @@ thread_try_wakeup ()
     cur = list_entry (e, struct thread, elem); 
     next = list_next (e);
 
-    if (cur->ticks == 0) {
+    if (cur->ticks <= timer_ticks ()) {
       /* put back to running thread */
       list_remove (e);
       list_push_back (&ready_list, e);
       cur->status = THREAD_READY;
     } else {
-      cur->ticks -= 1;
     }
 
     /* prepare for next loop */
@@ -630,10 +630,6 @@ uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 void 
 thread_sleep (int64_t ticks) 
 {
-  if (ticks <= 0) {
-    return;
-  }
-
   /* disable interrupts */
   enum intr_level old_level;
   ASSERT (!intr_context ());
@@ -649,4 +645,31 @@ thread_sleep (int64_t ticks)
   list_push_back (&sleep_list, &cur->elem);
   schedule ();
   intr_set_level (old_level);
+}
+
+struct thread *
+thread_highest_priority (struct list *lst)
+{
+  struct list_elem *e;
+  struct thread *ret = NULL;
+  struct thread *cur;
+
+  /* corner case: list is empty */
+  if (list_empty (lst)) {
+    return ret;
+  }
+
+  /* traverse the list. */
+  for (e = list_begin (lst); e != list_end (lst);) {
+    cur = list_entry (e, struct thread, elem);
+    if (ret == NULL || cur->priority > ret->priority) {
+      ret = cur;
+    }
+    e = list_next (e);
+  }
+
+  /* clean up */
+  ASSERT (ret != NULL);
+  list_remove (ret);
+  return ret;
 }
