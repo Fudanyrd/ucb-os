@@ -2,7 +2,8 @@
 
 # Test names.
 tests/threads_TESTS = $(addprefix tests/threads/,alarm-single alarm-simple	\
-alarm-multiple alarm-simultaneous alarm-priority alarm-zero		\
+alarm-multiple alarm-simultaneous alarm-priority alarm-zero	alarm-simple2	\
+alarm-moderate \
 alarm-negative priority-change priority-donate-one			\
 priority-donate-multiple priority-donate-multiple2			\
 priority-donate-nest priority-donate-sema priority-donate-lower		\

@@ -31,6 +31,9 @@ static struct list all_list;
 /** List of all sleeping processes. */
 static struct list sleep_list;
 
+/** Protect the sleep list */
+static struct lock sleep_lock UNUSED;
+
 /** Idle thread. */
 static struct thread *idle_thread;
 
@@ -96,6 +99,7 @@ thread_init (void)
   list_init (&ready_list);
   list_init (&all_list);
   list_init (&sleep_list);
+  lock_init (&sleep_lock);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -123,10 +127,10 @@ thread_start (void)
 
 /** On timer interrupt, try waking up sleeping threads */
 static void
-thread_try_wakeup()
+thread_try_wakeup ()
 {
   /* check empty list */
-  if (list_empty(&sleep_list)) {
+  if (list_empty (&sleep_list)) {
     return;
   }
 
@@ -135,14 +139,15 @@ thread_try_wakeup()
   struct list_elem *next;
   struct thread *cur;
 
-  for (e = list_begin(&sleep_list); e != list_end (&sleep_list); ) {
+  for (e = list_begin (&sleep_list); e != list_end (&sleep_list); ) {
     cur = list_entry (e, struct thread, elem); 
-    next = list_next(e);
+    next = list_next (e);
 
     if (cur->ticks == 0) {
       /* put back to running thread */
       list_remove (e);
       list_push_back (&ready_list, e);
+      cur->status = THREAD_READY;
     } else {
       cur->ticks -= 1;
     }
@@ -158,7 +163,7 @@ void
 thread_tick (void) 
 {
   /* try waking up some threads */
-  thread_try_wakeup();
+  thread_try_wakeup ();
 
   struct thread *t = thread_current ();
 
@@ -623,31 +628,24 @@ uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
 /** Sleep the thread, if ticks <= 0, return immediately. */
 void 
-thread_sleep(int64_t ticks) 
+thread_sleep (int64_t ticks) 
 {
   if (ticks <= 0) {
     return;
   }
 
-  struct thread *cur = thread_current();
-
-  /* do not sleep the idle_thread */
-  if (cur == idle_thread) {
-    return;
-  }
+  /* disable interrupts */
+  enum intr_level old_level;
+  ASSERT (!intr_context ());
+  old_level = intr_disable ();
 
   /* set ticks of current running thread */
+  struct thread *cur = thread_current ();
   cur->ticks = ticks;
-  cur->status = THREAD_READY;
+  cur->status = THREAD_SLEEPING;
 
   /* mock the process of yielding the cpu, but put
      current thread in the sleep list! */
-  enum intr_level old_level;
-  
-  ASSERT (!intr_context ());
-
-  old_level = intr_disable ();
-  list_remove (&cur->elem);
   list_push_back (&sleep_list, &cur->elem);
   schedule ();
   intr_set_level (old_level);

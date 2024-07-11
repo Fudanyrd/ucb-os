@@ -12,6 +12,38 @@
 
 static void test_sleep (int thread_cnt, int iterations);
 
+void test_alarm_simple2 (void) 
+{
+  /** fewer threads probably don't break program... */
+  test_sleep (1, 7);
+}
+
+/** sleep for several loops. */
+void test_alarm_moderate (void) {
+  const int loops = 5;    /**< # loops of sleeping */
+  const int ticks = 50;   /**< # ticks of each sleep */
+
+  int *buf = (int *) malloc (sizeof (int) * loops);
+
+  for (int i = 0; i < loops; ++i) 
+    {
+      buf[i] = 0;
+      /* sleep for several ticks, and set the value of buffer. */
+      timer_sleep (ticks);
+      buf[i] = i;
+    }
+
+  /* validate the values in the buffer. */
+  for (int i = 0; i < loops; ++i) 
+    {
+      ASSERT (buf[i] == i);
+    }
+
+  /* OK */ 
+  free (buf);
+  pass ();
+}
+
 void
 test_alarm_single (void) 
 {
@@ -23,7 +55,7 @@ test_alarm_multiple (void)
 {
   test_sleep (5, 7);
 }
-
+
 /** Information about the test. */
 struct sleep_test 
   {
@@ -123,10 +155,12 @@ test_sleep (int thread_cnt, int iterations)
     }
 
   /* Verify that we had the proper number of wakeups. */
-  for (i = 0; i < thread_cnt; i++)
-    if (threads[i].iterations != iterations)
+  for (i = 0; i < thread_cnt; i++) {
+    if (threads[i].iterations != iterations) {
       fail ("thread %d woke up %d times instead of %d",
             i, threads[i].iterations, iterations);
+    }
+  }
   
   lock_release (&test.output_lock);
   free (output);
