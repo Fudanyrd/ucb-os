@@ -241,8 +241,24 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
-  /* Add to run queue. */
-  thread_unblock (t);
+  /* Add to run queue; fake the process of thread_unblock */
+  enum intr_level old_level;
+  ASSERT (is_thread (t));
+
+  old_level = intr_disable ();
+  ASSERT (t->status == THREAD_BLOCKED);
+  list_push_back (&ready_list, &t->elem);
+  t->status = THREAD_READY;
+
+  struct thread *cur = thread_current ();
+  if (cur->priority < t->priority) {
+    /* yield the cpu, run thread t */
+    cur->status = THREAD_READY;
+    list_push_back (&ready_list, &cur->elem);
+    schedule ();
+  }
+
+  intr_set_level (old_level);
 
   return tid;
 }
@@ -378,7 +394,23 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+  /* turn off iterrupt */
+  enum intr_level old_level = intr_disable (); 
+  struct thread *cur = thread_current ();
+  int old_priority = cur->priority;
+  cur->priority = new_priority;
+
+  /* if priority is decreased */
+  if (old_priority > new_priority) 
+    {
+      /* yield the cpu */
+      list_push_back (&ready_list, &cur->elem);
+      cur->status = THREAD_READY;
+      schedule ();
+    }
+
+  /* OK */
+  intr_set_level (old_level);
 }
 
 /** Returns the current thread's priority. */
@@ -387,6 +419,9 @@ thread_get_priority (void)
 {
   return thread_current ()->priority;
 }
+
+/** maximum depth of borrower */
+#define MAX_BORROW_DEPTH 8
 
 /** Sets the current thread's nice value to NICE. */
 void
@@ -535,8 +570,18 @@ next_thread_to_run (void)
 {
   if (list_empty (&ready_list))
     return idle_thread;
-  else
-    return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  else {
+    struct thread *ret;
+    if (thread_mlfqs) {
+      /* NOT IMPLEMENTED, NOT PANIC */
+      ret = thread_highest_priority (&ready_list);
+    } else {
+      /* implement priority scheduling */
+      ret = thread_highest_priority (&ready_list);
+    }
+
+    return ret;
+  }
 }
 
 /** Completes a thread switch by activating the new thread's page
@@ -670,6 +715,6 @@ thread_highest_priority (struct list *lst)
 
   /* clean up */
   ASSERT (ret != NULL);
-  list_remove (ret);
+  list_remove (&ret->elem);
   return ret;
 }
