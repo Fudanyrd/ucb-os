@@ -32,6 +32,7 @@ static const struct test tests[] =
     {"priority-preempt", test_priority_preempt},
     {"priority-sema", test_priority_sema},
     {"priority-condvar", test_priority_condvar},
+    {"priority-lock", test_priority_lock},
     {"mlfqs-load-1", test_mlfqs_load_1},
     {"mlfqs-load-60", test_mlfqs_load_60},
     {"mlfqs-load-avg", test_mlfqs_load_avg},

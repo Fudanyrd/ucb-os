@@ -26,6 +26,7 @@ extern test_func test_priority_fifo;
 extern test_func test_priority_preempt;
 extern test_func test_priority_sema;
 extern test_func test_priority_condvar;
+extern test_func test_priority_lock;
 extern test_func test_mlfqs_load_1;
 extern test_func test_mlfqs_load_60;
 extern test_func test_mlfqs_load_avg;

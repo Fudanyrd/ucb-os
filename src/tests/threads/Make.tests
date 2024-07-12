@@ -3,7 +3,7 @@
 # Test names.
 tests/threads_TESTS = $(addprefix tests/threads/,alarm-single alarm-simple	\
 alarm-multiple alarm-simultaneous alarm-priority alarm-zero	alarm-simple2	\
-alarm-moderate \
+alarm-moderate priority-lock \
 alarm-negative priority-change priority-donate-one			\
 priority-donate-multiple priority-donate-multiple2			\
 priority-donate-nest priority-donate-sema priority-donate-lower		\
@@ -31,6 +31,7 @@ tests/threads_SRC += tests/threads/priority-fifo.c
 tests/threads_SRC += tests/threads/priority-preempt.c
 tests/threads_SRC += tests/threads/priority-sema.c
 tests/threads_SRC += tests/threads/priority-condvar.c
+tests/threads_SRC += tests/threads/priority-lock.c
 tests/threads_SRC += tests/threads/priority-donate-chain.c
 tests/threads_SRC += tests/threads/mlfqs-load-1.c
 tests/threads_SRC += tests/threads/mlfqs-load-60.c
