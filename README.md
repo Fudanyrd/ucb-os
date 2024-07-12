@@ -7,7 +7,10 @@ including QEMU, Bochs and VMWare Player!). The main source code, documentation a
 are developed by Ben Pfaff and others from Stanford (refer to its [LICENSE](./LICENSE)).
 
 ## Resources
-[homepage](https://pkuflyingpig.gitbook.io/pintos/getting-started/pintos-world)
+[homepage](https://pkuflyingpig.gitbook.io/pintos/getting-started/pintos-world)  
+[build-vm](https://github.com/PKU-OS/Pintos-dockerfile)  
+[Dockerfile](./Dockerfile) is the exact copy from this [url](https://github.com/PKU-OS/Pintos-dockerfile/blob/main/dockerfile), you may want to use it to setup your development virtual machine;
+also, [vm-setup.md](./vm-setup.md) contains instruction to setup using docker(**credit to PKUFlyingPig**).
 
 ## Acknowledgement
 This source code is adapted from professor ([Ryan Huang](huang@cs.jhu.edu)) at JHU, who also taught a similar undergraduate OS course. He made some changes to the original
