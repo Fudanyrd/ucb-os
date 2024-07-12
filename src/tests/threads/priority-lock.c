@@ -54,6 +54,9 @@ test_priority_lock (void)
   /* main thread wait for all 10 threads to be blocked, 
      and release the lock. */
   wait_long_time ();
+
+  /* check the status of the semaphore inside the lock. */
+  ASSERT (sema_priority (&priority_lock.semaphore) == 30);
   msg ("main thread releases the lock.");
   lock_release (&priority_lock);
 

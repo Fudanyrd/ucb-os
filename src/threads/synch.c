@@ -83,11 +83,17 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-      list_push_back (&sema->waiters, &thread_current ()->elem);
-      struct thread *high = thread_highest_priority (&sema->waiters);
-      list_push_front (&sema->waiters, &high->elem);
+      struct thread *cur = thread_current ();
+
+      /* invariant: the thread of highest priority is at the front */
+      if (cur->priority > sema_priority (sema)) {
+        list_push_front (&sema->waiters, &cur->elem);
+      } else {
+        list_push_back (&sema->waiters, &cur->elem);
+      }
       thread_block ();
     }
+  
   sema->value--;
   intr_set_level (old_level);
 }
@@ -130,9 +136,9 @@ sema_up (struct semaphore *sema)
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
+  sema->value++;
   if (!list_empty (&sema->waiters)) {
-    struct thread *waiter = list_entry (list_pop_front (&sema->waiters), 
-                                        struct thread, elem);
+    struct thread *waiter = thread_highest_priority (&sema->waiters);
     thread_unblock (waiter);
 
     if (!intr_context ()) {
@@ -146,7 +152,6 @@ sema_up (struct semaphore *sema)
       PANIC ("NOT IMPLEMENTED");
     }
   }
-  sema->value++;
   intr_set_level (old_level);
 }
 
