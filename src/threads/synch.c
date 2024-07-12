@@ -57,6 +57,7 @@ sema_priority (struct semaphore *sema)
 {
   /* by specification, the thread of highest priority is
      at the front of waiter list */
+  ASSERT (sema != NULL);
   if (list_empty (&sema->waiters)) {
     return PRI_MIN - 1;
   } 
@@ -352,7 +353,8 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
   ASSERT (lock_held_by_current_thread (lock));
 
   /* loop into all semas and find the highest priority thread */
-  struct sema *high = NULL;
+  struct semaphore *high = NULL; /**< record the hightest priority thread */
+  struct list_elem *rm = NULL;   /**< record the elem to remove */
 
   if (!list_empty (&cond->waiters)) {
     struct semaphore_elem *it;
@@ -364,9 +366,12 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
       if (high == NULL || 
           sema_priority (high) < sema_priority (&it->semaphore)) {
         high = &it->semaphore;
+        rm = &it->elem;
       }
     }
 
+    ASSERT (high != NULL);
+    list_remove (rm);
     sema_up (high);
   }
 }
