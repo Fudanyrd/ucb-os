@@ -50,6 +50,21 @@ sema_init (struct semaphore *sema, unsigned value)
   list_init (&sema->waiters);
 }
 
+/** Return the highest priority of thread in the waiter list,
+    PRI_MIN-1 if the sema is empty. */
+int 
+sema_priority (struct semaphore *sema)
+{
+  /* by specification, the thread of highest priority is
+     at the front of waiter list */
+  if (list_empty (&sema->waiters)) {
+    return PRI_MIN - 1;
+  } 
+
+  return list_entry (list_front (&sema->waiters), 
+                     struct thread, elem)->priority;
+}
+
 /** Down or "P" operation on a semaphore.  Waits for SEMA's value
    to become positive and then atomically decrements it.
 
@@ -69,6 +84,8 @@ sema_down (struct semaphore *sema)
   while (sema->value == 0) 
     {
       list_push_back (&sema->waiters, &thread_current ()->elem);
+      struct thread *high = thread_highest_priority (&sema->waiters);
+      list_push_front (&sema->waiters, &high->elem);
       thread_block ();
     }
   sema->value--;
@@ -113,9 +130,22 @@ sema_up (struct semaphore *sema)
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (!list_empty (&sema->waiters)) 
-    thread_unblock (list_entry (list_pop_front (&sema->waiters),
-                                struct thread, elem));
+  if (!list_empty (&sema->waiters)) {
+    struct thread *waiter = list_entry (list_pop_front (&sema->waiters), 
+                                        struct thread, elem);
+    thread_unblock (waiter);
+
+    if (!intr_context ()) {
+      /* do not let idle thread take over! 
+         doing so may halt the cpu. */
+      if (thread_current () != thread_idle ()) {
+        thread_yield ();
+      }
+    } else {
+      /* NOT IMPLEMENTED FOR NOW */
+      PANIC ("NOT IMPLEMENTED");
+    }
+  }
   sema->value++;
   intr_set_level (old_level);
 }
@@ -156,7 +186,7 @@ sema_test_helper (void *sema_)
       sema_up (&sema[1]);
     }
 }
-
+
 /** Initializes LOCK.  A lock can be held by at most a single
    thread at any given time.  Our locks are not "recursive", that
    is, it is an error for the thread currently holding a lock to
@@ -245,7 +275,7 @@ lock_held_by_current_thread (const struct lock *lock)
 
   return lock->holder == thread_current ();
 }
-
+
 /** One semaphore in a list. */
 struct semaphore_elem 
   {
@@ -316,9 +346,24 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
   ASSERT (!intr_context ());
   ASSERT (lock_held_by_current_thread (lock));
 
-  if (!list_empty (&cond->waiters)) 
-    sema_up (&list_entry (list_pop_front (&cond->waiters),
-                          struct semaphore_elem, elem)->semaphore);
+  /* loop into all semas and find the highest priority thread */
+  struct sema *high = NULL;
+
+  if (!list_empty (&cond->waiters)) {
+    struct semaphore_elem *it;
+    struct list_elem *e;
+
+    for (e = list_begin (&cond->waiters); e != list_end (&cond->waiters);
+         e = list_next (e)) {
+      it = list_entry (e, struct semaphore_elem, elem);
+      if (high == NULL || 
+          sema_priority (high) < sema_priority (&it->semaphore)) {
+        high = &it->semaphore;
+      }
+    }
+
+    sema_up (high);
+  }
 }
 
 /** Wakes up all threads, if any, waiting on COND (protected by

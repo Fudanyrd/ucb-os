@@ -147,7 +147,7 @@ thread_try_wakeup ()
     if (cur->ticks <= timer_ticks ()) {
       /* put back to running thread */
       list_remove (e);
-      list_push_back (&ready_list, e);
+      list_push_back (&ready_list, &cur->elem);
       cur->status = THREAD_READY;
     } else {
     }
@@ -717,4 +717,11 @@ thread_highest_priority (struct list *lst)
   ASSERT (ret != NULL);
   list_remove (&ret->elem);
   return ret;
+}
+
+/** return the special idle thread */
+struct thread *
+thread_idle (void)
+{
+  return idle_thread;
 }

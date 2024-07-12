@@ -149,4 +149,6 @@ void thread_sleep (int64_t ticks);
     returns null if the list is empty. */
 struct thread *thread_highest_priority (struct list *lst);
 
+struct thread *thread_idle (void);
+
 #endif /**< threads/thread.h */

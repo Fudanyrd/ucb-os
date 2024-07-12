@@ -36,7 +36,7 @@ test_priority_lock (void)
   ASSERT (!thread_mlfqs);
 
   lock_init (&priority_lock);
-  thread_set_priority (PRI_MIN + 2);
+  thread_set_priority (PRI_MIN + 1);
 
   /** main thread hold the lock */
   lock_acquire (&priority_lock);
@@ -58,6 +58,7 @@ test_priority_lock (void)
   lock_release (&priority_lock);
 
   /* ideally, the thread would be running in order. */
+  wait_long_time ();
 }
 
 static void
@@ -69,6 +70,6 @@ priority_lock_thread (void *aux UNUSED)
   msg ("Thread priority %d acquires the lock.", thread_current ()->priority);
   
   /* decrease the priority, and release the lock. */
-  thread_set_priority (PRI_MIN + 1);
+  thread_set_priority (PRI_MIN + 2);
   lock_release (&priority_lock);
 }
