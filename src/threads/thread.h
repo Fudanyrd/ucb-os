@@ -5,6 +5,8 @@
 #include <list.h>
 #include <stdint.h>
 
+#include "frac.h"
+
 /** States in a thread's life cycle. */
 enum thread_status
   {
@@ -89,6 +91,8 @@ struct thread
     char name[16];                      /**< Name (for debugging purposes). */
     uint8_t *stack;                     /**< Saved stack pointer. */
     int priority;                       /**< Priority. */
+    int nice;                           /**< Niceness used in mlfqs */
+    frac_t recent_cpu;                  /**< Value of recent_cup. */
     struct list_elem allelem;           /**< List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */

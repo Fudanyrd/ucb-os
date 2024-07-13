@@ -24,6 +24,9 @@
 /** List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+/** Keep track of number of threads in the ready list. This may yield 
+  faster load average update. */
+static unsigned int thread_ready_count;
 
 /** List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
@@ -43,6 +46,9 @@ static struct thread *initial_thread;
 
 /** Lock used by allocate_tid(). */
 static struct lock tid_lock;
+
+/** Exact value of load_avg */
+static frac_t thread_load_avg;
 
 /** Stack frame for kernel_thread(). */
 struct kernel_thread_frame 
@@ -74,6 +80,9 @@ static struct thread *next_thread_to_run (void);
 static void init_thread (struct thread *, const char *name, int priority);
 static bool is_thread (struct thread *) UNUSED;
 static void *alloc_frame (struct thread *, size_t size);
+static void thread_update_load_avg (void);
+static void thread_update_priority (struct thread *t, void *aux);
+static void thread_update_recent_cpu (struct thread *t, void *aux);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
@@ -97,7 +106,10 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   lock_init (&tid_lock);
+  
+  /* intialize ready list and ready count */
   list_init (&ready_list);
+  thread_ready_count = 0U;
   list_init (&all_list);
   list_init (&sleep_list);
   lock_init (&sleep_lock);
@@ -107,6 +119,9 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+
+  /* Set load_avg to 0. */
+  thread_load_avg = FRAC_ZERO;
 }
 
 /** Starts preemptive thread scheduling by enabling interrupts.
@@ -147,6 +162,7 @@ thread_try_wakeup ()
     if (cur->ticks <= timer_ticks ()) {
       /* put back to running thread */
       list_remove (e);
+      thread_ready_count += 1;
       list_push_back (&ready_list, &cur->elem);
       cur->status = THREAD_READY;
     } else {
@@ -166,6 +182,27 @@ thread_tick (void)
   thread_try_wakeup ();
 
   struct thread *t = thread_current ();
+
+  /* if mlfqs, set the value of recent_cpu. */
+  if (thread_mlfqs) {
+    /* increment recent_cpu by 1 */
+    if (t != idle_thread) {
+      t->recent_cpu = frac_add_int (t->recent_cpu, 1);  
+    }
+
+    const int64_t ticks = timer_ticks ();
+    /* for each thread in the ready list, sleep list, 
+     blocked list, recompute the recent_cpu. */
+    if (ticks % TIMER_FREQ == 0) {
+      /* update load_avg. */
+      thread_update_load_avg ();
+      thread_foreach (thread_update_recent_cpu, NULL);
+    }
+
+    if (ticks % 4 == 0) {
+      thread_foreach (thread_update_priority, NULL);
+    }
+  }
 
   /* Update statistics. */
   if (t == idle_thread)
@@ -248,6 +285,7 @@ thread_create (const char *name, int priority,
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
   list_push_back (&ready_list, &t->elem);
+  thread_ready_count += 1;
   t->status = THREAD_READY;
 
   struct thread *cur = thread_current ();
@@ -255,6 +293,7 @@ thread_create (const char *name, int priority,
     /* yield the cpu, run thread t */
     cur->status = THREAD_READY;
     list_push_back (&ready_list, &cur->elem);
+    thread_ready_count += 1;
     schedule ();
   }
 
@@ -297,6 +336,7 @@ thread_unblock (struct thread *t)
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
   list_push_back (&ready_list, &t->elem);
+  thread_ready_count += 1;
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -366,8 +406,10 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread) 
+  if (cur != idle_thread) {
     list_push_back (&ready_list, &cur->elem);
+    thread_ready_count += 1;
+  }
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -405,6 +447,7 @@ thread_set_priority (int new_priority)
     {
       /* yield the cpu */
       list_push_back (&ready_list, &cur->elem);
+      thread_ready_count += 1;
       cur->status = THREAD_READY;
       schedule ();
     }
@@ -427,31 +470,73 @@ thread_get_priority (void)
 void
 thread_set_nice (int nice UNUSED) 
 {
-  /* Not yet implemented. */
+  thread_current ()->nice = nice;
 }
 
 /** Returns the current thread's nice value. */
 int
 thread_get_nice (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  return thread_current ()->nice;
 }
 
 /** Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  frac_t v1 = (thread_load_avg);
+  v1.dat *= 100;
+  return frac_round_int (v1);
 }
 
 /** Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  frac_t ret = (thread_current ()->recent_cpu);
+  ret.dat *= 100;
+  return frac_round_int (ret);
+}
+  
+/** Update the value of load avg; only be called if timer_ticks () %
+   TIMER_FREQ == 0. */
+static void 
+thread_update_load_avg (void)
+{
+  /* Formula: l = l\times\frac{59}{60} + \frac{1}{60}n,
+   where n is the number of threads in the ready list. */
+  frac_t first = frac_mult (frac_const (59, 60), thread_load_avg);
+  int threads = thread_current () == idle_thread ? thread_ready_count
+                                                 : thread_ready_count + 1;
+  frac_t second = frac_mult (frac_const (1, 60), 
+                             frac_from_int (threads));
+  thread_load_avg = frac_add (first, second);
+}
+
+/** Update the thread priority of all threads. */
+static void
+thread_update_priority (struct thread *t, void *aux)
+{
+  frac_t v1 = frac_from_int (PRI_MAX - 2 * t->nice);
+  /* 0.25\times recent_cpu */
+  frac_t v2 = frac_mult (t->recent_cpu, frac_const (1, 4));
+  frac_t v3 = frac_sub (v1, v2);
+  t->priority = v3.dat >= 0 ? frac_to_int (v3) : 0;
+}
+  
+/** Update the recent_cpu of a thread t. */
+static void
+thread_update_recent_cpu (struct thread *t, void *aux)
+{
+  /* 2 * load_avg */
+  frac_t v1 = frac_mult (thread_load_avg, frac_from_int (2));
+  /* 2 * load_avg + 1 */
+  frac_t v2 = frac_add_int (v1, 1);
+  /* \\frac{v1}{v2} */
+  frac_t v3 = frac_div (v1, v2);
+  /* v3\\times recent_cpu */
+  frac_t v4 = frac_mult (v1, t->recent_cpu);
+  t->recent_cpu = frac_add_int (v4, t->nice);
 }
 
 /** Idle thread.  Executes when no other thread is ready to run.
@@ -537,6 +622,17 @@ init_thread (struct thread *t, const char *name, int priority)
 
   memset (t, 0, sizeof *t);
   t->status = THREAD_BLOCKED;
+
+  /* The initial thread starts with a nice value of zero;
+   other threads start with a nice value inherited from 
+   their parent thread. */
+  if (t == initial_thread) {
+    t->nice = 0;
+    t->recent_cpu = FRAC_ZERO;
+  } else {
+    t->nice = thread_current ()->nice;
+    t->recent_cpu = thread_current ()->recent_cpu;
+  }
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
@@ -579,6 +675,11 @@ next_thread_to_run (void)
       /* implement priority scheduling */
       ret = thread_highest_priority (&ready_list);
     }
+
+    /* A call to thread_highest priority will decrease the 
+     # threads in ready list. */
+    ASSERT (thread_ready_count != 0);
+    thread_ready_count -= 1;
 
     return ret;
   }

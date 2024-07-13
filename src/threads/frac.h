@@ -27,9 +27,11 @@ static const frac_t FRAC_ZERO = {0};
 static const frac_t FRAC_MAX  = {2147483647};
 /** min frac number, equivalent to -131072 */
 static const frac_t FRAC_MIN  = {1 << 31};
+/** one hundred (useful in thread scheduling) */
+static const frac_t FRAC_HUNDRED = {100 * FRAC_F};
 
 /** convert an integer to frac_t */
-static frac_t 
+static frac_t UNUSED
 frac_from_int (int val)
 {
   frac_t ret;
@@ -38,7 +40,7 @@ frac_from_int (int val)
 }
 
 /** return \\frac{a}{b} */
-static frac_t
+static frac_t UNUSED
 frac_const (int a, int b)
 {
   frac_t ret;
@@ -47,14 +49,14 @@ frac_const (int a, int b)
 }
 
 /** convert fractional number to integer (round toward 0) */
-static int 
+static int UNUSED
 frac_to_int (frac_t fr)
 {
   return fr.dat / FRAC_F;
 }
 
 /** convert fractional number to integer (round to nearest) */
-static int
+static int UNUSED
 frac_round_int (frac_t fr)
 {
   return fr.dat > 0 ? (fr.dat + FRAC_F / 2) / FRAC_F
@@ -62,7 +64,7 @@ frac_round_int (frac_t fr)
 }
 
 /** compute the sum of two fractional number */
-static frac_t
+static frac_t UNUSED
 frac_add (frac_t first, frac_t second)
 {
   frac_t ret;
@@ -71,7 +73,7 @@ frac_add (frac_t first, frac_t second)
 }
 
 /** compute the sum of fractional and int */
-static frac_t
+static frac_t UNUSED
 frac_add_int (frac_t first, int second)
 {
   frac_t ret;
@@ -80,7 +82,7 @@ frac_add_int (frac_t first, int second)
 }
 
 /** compute the difference of two fractional number */
-static frac_t
+static frac_t UNUSED
 frac_sub (frac_t first, frac_t second)
 {
   frac_t ret;
@@ -89,7 +91,7 @@ frac_sub (frac_t first, frac_t second)
 }
 
 /** compute the product of two fractional number */
-static frac_t
+static frac_t UNUSED
 frac_mult (frac_t first, frac_t second)
 {
   frac_t ret;
@@ -98,7 +100,7 @@ frac_mult (frac_t first, frac_t second)
 }
 
 /** compute the division of fist, second, will check second != 0 */
-static frac_t
+static frac_t UNUSED
 frac_div (frac_t first, frac_t second)
 {
   ASSERT (second.dat != 0);
@@ -108,14 +110,14 @@ frac_div (frac_t first, frac_t second)
 }
 
 /** return true if first > second */
-static bool
+static bool UNUSED
 frac_cmp_g (frac_t first, frac_t second)
 {
   return first.dat > second.dat;
 }
 
 /** return true if first < second */
-static bool
+static bool UNUSED
 frac_cmp_l (frac_t first, frac_t second)
 {
   return first.dat < second.dat;
