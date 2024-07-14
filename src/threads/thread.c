@@ -451,7 +451,19 @@ thread_set_priority (int new_priority)
   /* turn off iterrupt */
   enum intr_level old_level = intr_disable (); 
   struct thread *cur = thread_current ();
+
+  /* Check the situation of priority donation */
+  if (cur->priority > cur->pri_actual) {
+    cur->pri_actual = new_priority;
+    if (new_priority > cur->priority) {
+      cur->priority = new_priority;
+    }
+    intr_set_level (old_level);
+    return;
+  }
+
   int old_priority = cur->priority;
+  cur->pri_actual = new_priority;
   cur->priority = new_priority;
 
   /* if priority is decreased */
@@ -473,6 +485,13 @@ int
 thread_get_priority (void) 
 {
   return thread_current ()->priority;
+}
+
+/** Returns the current thread's actual priority(i.e. no borrow) */
+int 
+thread_get_actual_priority (void)
+{
+  return thread_current ()->pri_actual;
 }
 
 /** maximum depth of borrower */
@@ -655,6 +674,9 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->pri_actual = priority;
+  /* Initially no donator */
+  t->donator = NULL;
   if (thread_mlfqs) {
     /* Ignore argument to priority */
     thread_update_priority (t, NULL);

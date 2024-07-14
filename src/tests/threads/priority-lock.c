@@ -1,5 +1,7 @@
 /** Tests that lock_release() wakes up the highest-priority thread
-   in the waiter list. */
+   in the waiter list. This test should pass if you have 
+   implemented priority donation. If you have not implemented, 
+   you can delete the assertions checking priority donation. */
 
 #include <stdio.h>
 #include "tests/threads/tests.h"
@@ -55,8 +57,16 @@ test_priority_lock (void)
      and release the lock. */
   wait_long_time ();
 
+  /* check that main thread is holding the lock. */
+  ASSERT (priority_lock.holder == thread_current ());
+  /* simply check that main thread have borrowed priority. */
+  ASSERT (thread_get_priority () == 30);
+  /* simply check that main thread's actual priority does not change! */
+  ASSERT (thread_get_actual_priority () == PRI_MIN + 1);
   /* check the status of the semaphore inside the lock. */
   ASSERT (sema_priority (&priority_lock.semaphore) == 30);
+
+  /* Now the main thread release the lock. */
   msg ("main thread releases the lock.");
   lock_release (&priority_lock);
 

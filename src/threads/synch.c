@@ -51,7 +51,9 @@ sema_init (struct semaphore *sema, unsigned value)
 }
 
 /** Return the highest priority of thread in the waiter list,
-    PRI_MIN-1 if the sema is empty. */
+    PRI_MIN-1 if the sema is empty. THIS FUNCTION HAS SOME 
+    DEFICIENCIES, THIS IS BECAUSE THE INVARINT MAY BE BROKEN
+    BECAUSE OF PRIORITY DONATION! */
 int 
 sema_priority (struct semaphore *sema)
 {
@@ -139,8 +141,11 @@ sema_up (struct semaphore *sema)
   old_level = intr_disable ();
   sema->value++;
   if (!list_empty (&sema->waiters)) {
-    struct thread *waiter = list_entry (list_pop_front (&sema->waiters), 
-                                        struct thread, elem);
+    /** Unfortunately, directly acquire from the head is not safe:
+       For instance, in the test case priority-donate-sema, the
+       thread in the middle of the list may get higher priority,
+       breaking the invariant! */
+    struct thread *waiter = thread_highest_priority (&sema->waiters);
     thread_unblock (waiter);
 
     /* maintain the invariant of waiter list (see synch.h) */
@@ -239,8 +244,26 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
+  /* A timer interrupt coming here will wreak havoc */
+  enum intr_level old_level;
+  old_level = intr_disable ();
+
+  /* Compute the priority of holding thread */
+  int prisema = sema_priority (&lock->semaphore);
+  int prith = thread_current ()->priority;
+  int priority = prisema > prith ? prisema : prith;
+
+  struct thread *th = lock->holder;
+  if (!thread_mlfqs && th != NULL && th->priority < priority) {
+    /* Update the donator and priority of th */
+    th->priority = priority;
+    /* Who is the donator of the thread ?*/
+    th->donator = prisema > prith ? th->donator : thread_current ();
+  }
+
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
+  intr_set_level (old_level);
 }
 
 /** Tries to acquires LOCK and returns true if successful or false
@@ -274,6 +297,20 @@ lock_release (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
 
+  /* Retract the borrowed priority of the thread(If donator matches) */
+  if (!list_empty (&(lock->semaphore.waiters))) {
+    struct thread *head = list_entry (list_front (&(lock->semaphore.waiters)),
+                                      struct thread, elem);
+    if (head == lock->holder->donator ) {
+      /* Donator matches! Recall priority! */
+      lock->holder->priority = lock->holder->pri_actual;
+      lock->holder->donator = NULL;
+    }
+    /** A little note on why the head can be the donator:
+       Notice the invaraint of semaphore, only these with
+       the highest priority can be the front of waiter list,
+       and only these threads can be donator of priority. */
+  }
   lock->holder = NULL;
   sema_up (&lock->semaphore);
 }

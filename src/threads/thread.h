@@ -90,7 +90,9 @@ struct thread
     enum thread_status status;          /**< Thread state. */
     char name[16];                      /**< Name (for debugging purposes). */
     uint8_t *stack;                     /**< Saved stack pointer. */
-    int priority;                       /**< Priority. */
+    int priority;                       /**< Priority (maybe borrowed). */
+    int pri_actual;                     /**< Actual priority (no borrow) */
+    struct thread *donator;             /**< Priority donator of this */
     int nice;                           /**< Niceness used in mlfqs */
     frac_t recent_cpu;                  /**< Value of recent_cup. */
     struct list_elem allelem;           /**< List element for all threads list. */
@@ -139,6 +141,7 @@ typedef void thread_action_func (struct thread *t, void *aux);
 void thread_foreach (thread_action_func *, void *);
 
 int thread_get_priority (void);
+int thread_get_actual_priority (void);
 int thread_borrowed_priority (struct thread *th);
 void thread_set_priority (int);
 
