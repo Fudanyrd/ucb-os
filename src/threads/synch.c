@@ -139,8 +139,15 @@ sema_up (struct semaphore *sema)
   old_level = intr_disable ();
   sema->value++;
   if (!list_empty (&sema->waiters)) {
-    struct thread *waiter = thread_highest_priority (&sema->waiters);
+    struct thread *waiter = list_entry (list_pop_front (&sema->waiters), 
+                                        struct thread, elem);
     thread_unblock (waiter);
+
+    /* maintain the invariant of waiter list (see synch.h) */
+    if (!list_empty (&sema->waiters)) {
+      struct thread *head = thread_highest_priority (&sema->waiters);
+      list_push_front (&sema->waiters, &head->elem);
+    }
 
     if (!intr_context ()) {
       /* do not let idle thread take over! 
