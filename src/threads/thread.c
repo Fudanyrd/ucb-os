@@ -124,6 +124,13 @@ thread_init (void)
   thread_load_avg = FRAC_ZERO;
 }
 
+/** return the number of threads in the ready list (for debug) */
+unsigned int 
+thread_ready (void)
+{
+  return thread_ready_count;
+}
+
 /** Starts preemptive thread scheduling by enabling interrupts.
    Also creates the idle thread. */
 void
@@ -436,6 +443,11 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
+  /* If mlfqs, this call is ignored */
+  if (thread_mlfqs) {
+    return;
+  }
+
   /* turn off iterrupt */
   enum intr_level old_level = intr_disable (); 
   struct thread *cur = thread_current ();
@@ -508,8 +520,7 @@ thread_update_load_avg (void)
   frac_t first = frac_mult (frac_const (59, 60), thread_load_avg);
   int threads = thread_current () == idle_thread ? thread_ready_count
                                                  : thread_ready_count + 1;
-  frac_t second = frac_mult (frac_const (1, 60), 
-                             frac_from_int (threads));
+  frac_t second = frac_const (threads, 60);
   thread_load_avg = frac_add (first, second);
 }
 
@@ -535,7 +546,7 @@ thread_update_recent_cpu (struct thread *t, void *aux)
   /* \\frac{v1}{v2} */
   frac_t v3 = frac_div (v1, v2);
   /* v3\\times recent_cpu */
-  frac_t v4 = frac_mult (v1, t->recent_cpu);
+  frac_t v4 = frac_mult (v3, t->recent_cpu);
   t->recent_cpu = frac_add_int (v4, t->nice);
 }
 
@@ -636,6 +647,11 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  if (thread_mlfqs) {
+    /* Ignore argument to priority */
+    thread_update_priority (t, NULL);
+  }
+
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
