@@ -51,9 +51,7 @@ sema_init (struct semaphore *sema, unsigned value)
 }
 
 /** Return the highest priority of thread in the waiter list,
-    PRI_MIN-1 if the sema is empty. THIS FUNCTION HAS SOME 
-    DEFICIENCIES, THIS IS BECAUSE THE INVARINT MAY BE BROKEN
-    BECAUSE OF PRIORITY DONATION! */
+    PRI_MIN-1 if the sema is empty.  */
 int 
 sema_priority (struct semaphore *sema)
 {
@@ -64,8 +62,26 @@ sema_priority (struct semaphore *sema)
     return PRI_MIN - 1;
   } 
 
-  return list_entry (list_front (&sema->waiters), 
-                     struct thread, elem)->priority;
+  enum intr_level old_level = intr_disable ();
+  struct thread *th = thread_highest_priority (&sema->waiters);
+  list_push_back (&sema->waiters, &th->elem);
+  int ret = th->priority;
+  intr_set_level (old_level);
+
+  return ret;
+}
+
+/** returns the thread of highest priority in the semaphore,
+   Will NOT extract it from the semaphore. */
+struct thread *
+sema_highest_priority (struct semaphore *sema)
+{
+  enum intr_level old_level = intr_disable ();
+  struct thread *th = thread_highest_priority (&sema->waiters);
+  list_push_back (&sema->waiters, &th->elem);
+  intr_set_level (old_level);
+
+  return th;
 }
 
 /** Down or "P" operation on a semaphore.  Waits for SEMA's value
@@ -89,6 +105,7 @@ sema_down (struct semaphore *sema)
       struct thread *cur = thread_current ();
 
       /* invariant: the thread of highest priority is at the front */
+      /* HINT: THIS INVARANT IS REMOVED */
       if (cur->priority > sema_priority (sema)) {
         list_push_front (&sema->waiters, &cur->elem);
       } else {
@@ -147,12 +164,6 @@ sema_up (struct semaphore *sema)
        breaking the invariant! */
     struct thread *waiter = thread_highest_priority (&sema->waiters);
     thread_unblock (waiter);
-
-    /* maintain the invariant of waiter list (see synch.h) */
-    if (!list_empty (&sema->waiters)) {
-      struct thread *head = thread_highest_priority (&sema->waiters);
-      list_push_front (&sema->waiters, &head->elem);
-    }
 
     if (!intr_context ()) {
       /* do not let idle thread take over! 
@@ -299,8 +310,7 @@ lock_release (struct lock *lock)
 
   /* Retract the borrowed priority of the thread(If donator matches) */
   if (!list_empty (&(lock->semaphore.waiters))) {
-    struct thread *head = list_entry (list_front (&(lock->semaphore.waiters)),
-                                      struct thread, elem);
+    struct thread *head = sema_highest_priority (&lock->semaphore);
     if (head == lock->holder->donator ) {
       /* Donator matches! Recall priority! */
       lock->holder->priority = lock->holder->pri_actual;

@@ -5,9 +5,7 @@
 #include <stdbool.h>
 #include "thread.h"
 
-/** A counting semaphore. The semaphore ensures that
-  The thread with highest priority is at the front 
-  of the waiter list. */
+/** A counting semaphore. */
 struct semaphore 
   {
     unsigned value;             /**< Current value. */
@@ -19,6 +17,7 @@ void sema_down (struct semaphore *);
 bool sema_try_down (struct semaphore *);
 void sema_up (struct semaphore *);
 void sema_self_test (void);
+struct thread *sema_highest_priority (struct semaphore *);
 int sema_priority (struct semaphore *);
 
 /** Lock. */
