@@ -168,6 +168,14 @@ mlfqs_to_int_helper (int x, int y, int res)
   ASSERT (frac_to_int (frac_const (x, y)) == res);
 }
 
+/** Test \frac{x}{y} round res */
+static void
+mlfqs_round_int_helper (int x, int y, int res)
+{
+  ASSERT (y > 0);
+  ASSERT (frac_round_int (frac_const (x, y)) == res);
+}
+
 /** Test conversion to integer */
 void
 test_mlfqs_to_int (void)
@@ -180,7 +188,42 @@ test_mlfqs_to_int (void)
   mlfqs_to_int_helper (-8, 5, -1);
   mlfqs_to_int_helper (112, 5, 22);
   mlfqs_to_int_helper (-112, 5, -22);
+  mlfqs_to_int_helper (1, 60, 0);
+  mlfqs_round_int_helper (1, 60, 0);
+  mlfqs_round_int_helper (59, 60, 1);
   
   /* OK */
+  pass ();
+}
+
+/** Test all arithmetics */
+void
+test_mlfqs_frac_mixed (void)
+{
+  /* Coefficients used in test */
+  const frac_t u = frac_const (59, 60);
+  const frac_t v = frac_const (1, 60);
+  frac_t x;
+  frac_t y;
+  frac_t res;  /**< mock thread_load_avg in threads/thread.c */
+  frac_t ret;  /**< mock return value from thread_get_load_avg. */
+
+  /** You may have spotted that I'm mocking the process of
+     thread_update_load_avg. Good eyes! */
+
+  x = frac_const (0, 1);
+  y = frac_const (60, 1);
+  res = frac_add (frac_mult (x, u), frac_mult (y, v));
+  ret = frac_mult (res, FRAC_HUNDRED);
+  ASSERT (frac_round_int (res) == 1);
+  ASSERT (frac_round_int (ret) == 100);
+
+  /* update load avg! */
+  x = res;
+  y = frac_const (60, 1);
+  res = frac_add (frac_mult (x, u), frac_mult (y, v));
+  ret = frac_mult (res, FRAC_HUNDRED);
+  ASSERT (frac_round_int (res) == 2);
+
   pass ();
 }

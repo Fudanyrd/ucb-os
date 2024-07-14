@@ -37,6 +37,7 @@ static const struct test tests[] =
     {"mlfqs-frac-sub", test_mlfqs_frac_sub},
     {"mlfqs-frac-mult", test_mlfqs_frac_mult},
     {"mlfqs-frac-div", test_mlfqs_frac_div},
+    {"mlfqs-frac-mixed", test_mlfqs_frac_mixed},
     {"mlfqs-to-int", test_mlfqs_to_int},
     {"mlfqs-load-1", test_mlfqs_load_1},
     {"mlfqs-load-60", test_mlfqs_load_60},

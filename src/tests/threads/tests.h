@@ -31,6 +31,7 @@ extern test_func test_mlfqs_frac_add;
 extern test_func test_mlfqs_frac_sub;
 extern test_func test_mlfqs_frac_mult;
 extern test_func test_mlfqs_frac_div;
+extern test_func test_mlfqs_frac_mixed;
 extern test_func test_mlfqs_to_int;
 extern test_func test_mlfqs_load_1;
 extern test_func test_mlfqs_load_60;
