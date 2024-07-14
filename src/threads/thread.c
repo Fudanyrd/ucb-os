@@ -482,7 +482,15 @@ thread_get_priority (void)
 void
 thread_set_nice (int nice UNUSED) 
 {
-  thread_current ()->nice = nice;
+  struct thread *th = thread_current ();
+  const int oldpri = th->priority;
+  th->nice = nice;
+
+  /* recompute priority */
+  thread_update_priority (th, NULL);
+
+  /* Current thread may lose to other threads, yield. */
+  thread_yield ();
 }
 
 /** Returns the current thread's nice value. */
