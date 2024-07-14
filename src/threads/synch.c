@@ -32,6 +32,46 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+/** Add the lock to the list of the thread th, and update 
+   its priority if necessary. This function is called 
+   when a thread successfully acqurires the lock. */
+void
+thread_add_lock (struct thread *th, struct lock *lock)
+{
+  list_push_back (&th->locks, &lock->elem);
+  int prilk = sema_priority (&lock->semaphore);
+  th->priority = prilk > th->priority ? prilk : th->priority; 
+}
+
+/** Remove the lock from the list of thread th and update
+   its priority. This function is called when the lock is 
+   released by its holder. */
+void 
+thread_rm_lock (struct thread *th, struct lock *lock)
+{
+  struct list_elem *e;
+  struct list_elem *next;
+  struct lock *lk;
+  int pri = th->pri_actual;
+
+  for (e = list_begin (&th->locks); e != list_end (&th->locks); )
+    {
+      next = list_next (e);
+      lk = list_entry (e, struct lock, elem);
+      if (lk == lock) {
+        /* remove from list */
+        list_remove (e);
+      } else {
+        int prilk = sema_priority (&lk->semaphore);
+        pri = pri > prilk ? pri : prilk;
+      }
+
+      e = next;
+    }
+  
+  th->priority = pri;
+}
+
 /** Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -268,12 +308,11 @@ lock_acquire (struct lock *lock)
   if (!thread_mlfqs && th != NULL && th->priority < priority) {
     /* Update the donator and priority of th */
     th->priority = priority;
-    /* Who is the donator of the thread ?*/
-    th->donator = prisema > prith ? th->donator : thread_current ();
   }
 
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
+  thread_add_lock (lock->holder, lock);
   intr_set_level (old_level);
 }
 
@@ -309,18 +348,11 @@ lock_release (struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
 
   /* Retract the borrowed priority of the thread(If donator matches) */
-  if (!list_empty (&(lock->semaphore.waiters))) {
-    struct thread *head = sema_highest_priority (&lock->semaphore);
-    if (head == lock->holder->donator ) {
-      /* Donator matches! Recall priority! */
-      lock->holder->priority = lock->holder->pri_actual;
-      lock->holder->donator = NULL;
-    }
-    /** A little note on why the head can be the donator:
-       Notice the invaraint of semaphore, only these with
-       the highest priority can be the front of waiter list,
-       and only these threads can be donator of priority. */
+  struct thread *th = lock->holder;
+  if (!thread_mlfqs) {
+    thread_rm_lock (th, lock);
   }
+
   lock->holder = NULL;
   sema_up (&lock->semaphore);
 }

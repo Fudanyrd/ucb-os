@@ -676,7 +676,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->pri_actual = priority;
   /* Initially no donator */
-  t->donator = NULL;
+  list_init (&t->locks);
   if (thread_mlfqs) {
     /* Ignore argument to priority */
     thread_update_priority (t, NULL);

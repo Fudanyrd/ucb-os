@@ -92,13 +92,13 @@ struct thread
     uint8_t *stack;                     /**< Saved stack pointer. */
     int priority;                       /**< Priority (maybe borrowed). */
     int pri_actual;                     /**< Actual priority (no borrow) */
-    struct thread *donator;             /**< Priority donator of this */
     int nice;                           /**< Niceness used in mlfqs */
     frac_t recent_cpu;                  /**< Value of recent_cup. */
     struct list_elem allelem;           /**< List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /**< List element. */
+    struct list locks;                  /**< All locks the thread is holding. */
 
     /* Shared between thread.c and device/timer.c. */
     int64_t ticks;                      /**< Sleep until timer ticks */
@@ -158,5 +158,9 @@ void thread_sleep (int64_t ticks);
 struct thread *thread_highest_priority (struct list *lst);
 
 struct thread *thread_idle (void);
+
+struct lock;
+void thread_add_lock (struct thread *, struct lock *);
+void thread_rm_lock (struct thread *, struct lock *);
 
 #endif /**< threads/thread.h */
