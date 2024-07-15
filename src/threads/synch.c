@@ -212,8 +212,7 @@ sema_up (struct semaphore *sema)
         thread_yield ();
       }
     } else {
-      /* NOT IMPLEMENTED FOR NOW */
-      PANIC ("NOT IMPLEMENTED");
+      /** DO NOT YIELD THE CPU, AND NO LONGER NEED PRIORITY SCHEDULING. */
     }
   }
   intr_set_level (old_level);
