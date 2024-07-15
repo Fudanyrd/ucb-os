@@ -46,12 +46,17 @@ syscall_args (struct intr_frame *f)
   return (f->esp + 4);
 }
 
-int 
-halt_executor (void *args) 
+static int 
+halt_executor (void *args UNUSED) 
 {
-  printf ("system call halt!\n");
+  /* Turn off timer interrput, and fall into an infinite loop! */
+  intr_disable ();
+  for (;;) {}
+
+  /* Will not return */
   return 0;
 }
+
 int 
 exit_executor (void *args) 
 {
@@ -74,6 +79,15 @@ syscall_executor_cnt = (sizeof (syscall_executors)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
+  /* Check if the system call is implemented. */
+  int id = syscall_id (f);
+  if (id >= 0 && id < syscall_executor_cnt) 
+    {
+      syscall_executor_t executor = syscall_executors[id];
+      int ret = executor (syscall_args (f));
+      /* set the return value of intr_frame. */
+      f->eax = ret;
+    }
   printf ("system call %d!\n", syscall_id (f));
   thread_exit ();
 }
