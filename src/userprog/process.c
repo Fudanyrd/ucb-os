@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "userprog/gdt.h"
+#include "userprog/mode.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
 #include "filesys/directory.h"
@@ -19,7 +20,7 @@
 #include "threads/vaddr.h"
 
 static thread_func start_process NO_RETURN;
-static bool load (const char *cmdline, void (**eip) (void), void **esp);
+static bool load (char *cmdline, void (**eip) (void), void **esp);
 
 /** Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -88,6 +89,7 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
+  for (;;) {}
   return -1;
 }
 
@@ -206,7 +208,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    and its initial stack pointer into *ESP.
    Returns true if successful, false otherwise. */
 bool
-load (const char *file_name, void (**eip) (void), void **esp) 
+load (char *file_name, void (**eip) (void), void **esp) 
 {
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
@@ -220,6 +222,24 @@ load (const char *file_name, void (**eip) (void), void **esp)
   if (t->pagedir == NULL) 
     goto done;
   process_activate ();
+
+  /* Zero out blanks, tabs in file_name */
+#ifdef TEST
+  printf ("file name is %s\n", file_name);
+#endif
+  int it;  /**< iterator of file name */
+  for (it = 0; file_name[it] != '\0'; ++it) 
+    {
+      if (file_name[it] == ' ' || file_name[it] == '\t')
+        {
+          file_name[it] = '\0';
+        }
+    }
+  /** length of file name */
+  const int fn_len = it;
+#ifdef TEST
+  printf ("len of file name is %d\n", fn_len);
+#endif
 
   /* Open executable file. */
   file = filesys_open (file_name);
@@ -304,6 +324,53 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* Set up stack. */
   if (!setup_stack (esp))
     goto done;
+
+  /* Parse params of the program */
+  char *argp = (char *)(PHYS_BASE - fn_len - 1);
+  int args = 0;              /**< number of args. */
+  char *argv[10];            /**< my implementation support up to 10 args. */
+  bool is_start = true;      /**< is it the start of a "token"? */
+  for (i = 0; i <= fn_len; ++i) 
+    {
+      argp[i] = file_name[i];
+      if (is_start) {
+        if (argp[i] != '\0') {
+          argv[args] = argp + i;
+          args++;
+          is_start = false;
+        }
+      } else {
+        if (argp[i] == '\0') {
+          is_start = true;
+        }
+      }
+    }
+
+#ifdef TEST
+  printf ("Got %d tokens\n", args);
+#endif
+
+  /* Set up argument to main. */
+  unsigned bias = (unsigned) argp % 4;
+  void *sp = (void *)(argp - bias);
+  sp -= 4;
+  *(char **)sp = NULL;
+  for (i = args - 1; i >= 0; --i) {
+    sp -= 4; 
+    *(char **)sp = argv[i];
+  }
+  sp -= 4;
+  *(char **)sp = argv[0];    /**< argv */
+  sp -= 4;
+  *(int *)sp = args;         /**< args */
+  sp -= 4;
+  *(int *)sp = 0;            /**< return address */
+  *esp = sp;                 /**< esp */
+
+#ifdef TEST
+  printf ("After passing, esp is %x.\n", (unsigned)sp);
+  hex_dump (sp, sp, PHYS_BASE - sp, true);
+#endif
 
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
