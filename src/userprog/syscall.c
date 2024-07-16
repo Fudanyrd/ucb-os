@@ -196,8 +196,13 @@ exit_executor (void *args)
 #endif
   /* Weird idea: use ticks to store the exit code! */
   cur->ticks = code;
+  /* Notice that thread_exit () automatically call process_exit(). */
+#ifdef USERPROG
+  thread_exit ();
+#else
   process_exit ();
   thread_exit ();
+#endif /**< USERPROG */
   return 0;
 }
 
