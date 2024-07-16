@@ -309,8 +309,57 @@ filesize_executor (void *args)
 static int 
 read_executor (void *args)
 {
-  PANIC ("syscall read is not implemented");
-  return 0;
+  struct thread *cur = thread_current ();
+
+  unsigned int bytes;
+  /* parameters */
+  char *ubuf;
+  unsigned int len;
+  int fd;
+
+  /* parse params(for now, assume fd == 1) */
+  bytes = copy_from_user (cur->pagedir, args, &fd, sizeof (fd));
+  if (bytes != sizeof (fd)) {
+    return -1;
+  }
+  bytes = copy_from_user (cur->pagedir, args + 4, &ubuf, sizeof (ubuf));
+  if (bytes != sizeof (ubuf)) {
+    return -1;
+  }
+  bytes = copy_from_user (cur->pagedir, args + 8, &len, sizeof (len));
+  if (bytes != sizeof (len)) {
+    return -1;
+  }
+
+  /* make a kernel buffer, and print to console */
+  if (len == 0) {
+    return 0;
+  }
+  char *kbuf = (char *) malloc (len);
+  if (kbuf == NULL) {
+    return -1;
+  }
+
+  unsigned ret = 0;
+  if (fd == 0) {
+    /* read len bytes from console */
+    for (ret = 0; ret < len; ++ret) {
+      kbuf[ret] = input_getc ();
+      if (kbuf[ret] == '\n' || kbuf[ret] == '\r') {
+        printf ("\n");
+        kbuf[ret] = '\n';
+        ++ret;
+        break;
+      }
+      printf ("%c", kbuf[ret]);
+    }
+  } else {
+    PANIC ("not support writing to file now");
+  }
+  ret = copy_to_user (cur->pagedir, kbuf, ubuf, ret);
+  free (kbuf);
+
+  return ret;
 }
 
 static int 
