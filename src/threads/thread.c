@@ -681,6 +681,10 @@ init_thread (struct thread *t, const char *name, int priority)
     /* Ignore argument to priority */
     thread_update_priority (t, NULL);
   }
+#ifdef THREAD_DONATE_NEST
+  /**< initially waiting for no locks. */
+  t->acquiring = NULL;
+#endif
 
   t->magic = THREAD_MAGIC;
 

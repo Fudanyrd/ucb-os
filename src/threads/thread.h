@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #include "frac.h"
+#include "settings.h"
 
 /** States in a thread's life cycle. */
 enum thread_status
@@ -99,6 +100,10 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /**< List element. */
     struct list locks;                  /**< All locks the thread is holding. */
+#ifdef THREAD_DONATE_NEST
+    struct lock *acquiring;             /**< Lock that thread is trying to acquire
+                                            i.e. in the wait list now */
+#endif
 
     /* Shared between thread.c and device/timer.c. */
     int64_t ticks;                      /**< Sleep until timer ticks */

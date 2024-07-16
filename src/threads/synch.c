@@ -72,6 +72,37 @@ thread_rm_lock (struct thread *th, struct lock *lock)
   th->priority = pri;
 }
 
+static void
+lock_donate_nest (struct lock *lock)
+{
+#ifdef THREAD_DONATE_NEST
+  struct thread *th;
+  struct lock *acquiring;
+  
+  /* The lock may not have holder now. */
+  if (lock->holder == NULL) {
+    return;
+  }
+  while (1) 
+    {
+      th = lock->holder;
+      acquiring = th->acquiring;
+
+      if (acquiring == NULL)
+        {
+          break;
+        }
+      
+      /* check that holder of acquiring is not null. */
+      if (acquiring->holder->priority < th->priority)
+        {
+          acquiring->holder->priority = th->priority;
+        }
+      lock = acquiring;
+    }
+#endif
+}
+
 /** Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -298,6 +329,11 @@ lock_acquire (struct lock *lock)
   enum intr_level old_level;
   old_level = intr_disable ();
 
+  /* Modify the acquiring member of thread_current () */
+#ifdef THREAD_DONATE_NEST
+  thread_current ()->acquiring = lock;
+#endif
+
   /* Compute the priority of holding thread */
   int prisema = sema_priority (&lock->semaphore);
   int prith = thread_current ()->priority;
@@ -309,8 +345,16 @@ lock_acquire (struct lock *lock)
     th->priority = priority;
   }
 
+  /* Perform nested donation */
+#ifdef THREAD_DONATE_NEST
+  lock_donate_nest (lock);
+#endif
+
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
+#ifdef THREAD_DONATE_NEST
+  lock->holder->acquiring = NULL;
+#endif
   thread_add_lock (lock->holder, lock);
   intr_set_level (old_level);
 }
