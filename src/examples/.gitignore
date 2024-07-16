@@ -2,6 +2,7 @@ cat
 cmp
 cp
 echo
+exit
 halt
 hex-dump
 ls

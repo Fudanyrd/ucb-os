@@ -324,12 +324,13 @@ run_task (char **argv)
   const char *task = argv[1];
   
   printf ("Executing '%s':\n", task);
+  int exitcode;
 #ifdef USERPROG
-  process_wait (process_execute (task));
+  exitcode = process_wait (process_execute (task));
 #else
   run_test (task);
 #endif
-  printf ("Execution of '%s' complete.\n", task);
+  printf ("Execution of '%s' complete with stat %x.\n", task, exitcode);
 }
 
 /** Executes all of the actions specified in ARGV[]

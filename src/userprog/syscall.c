@@ -9,6 +9,7 @@
 #include <string.h>
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
+#include "threads/malloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 
@@ -184,7 +185,7 @@ halt_executor (void *args UNUSED)
   return 0;
 }
 
-int 
+static int 
 exit_executor (void *args) 
 {
   struct thread *cur = thread_current ();
@@ -206,11 +207,30 @@ exit_executor (void *args)
   return 0;
 }
 
+/** Other syscall executors */
+static int exit_executor (void *args);
+static int exec_executor (void *args);
+static int wait_executor (void *args);
+static int create_executor (void *args);
+static int remove_executor (void *args);
+static int open_executor (void *args);
+static int filesize_executor (void *args);
+static int read_executor (void *args);
+static int write_executor (void *args);
+
 /** list of implemented system calls */
 static syscall_executor_t syscall_executors[] = 
   {
     [SYS_HALT] halt_executor,
     [SYS_EXIT] exit_executor,
+    [SYS_EXEC] exec_executor,
+    [SYS_WAIT] wait_executor,
+    [SYS_CREATE] create_executor,
+    [SYS_REMOVE] remove_executor,
+    [SYS_OPEN] open_executor,
+    [SYS_FILESIZE] filesize_executor,
+    [SYS_READ] read_executor,
+    [SYS_WRITE] write_executor,
   };
 
 /** Number of implemented system calls(to detect overflow) */
@@ -243,4 +263,98 @@ syscall_handler (struct intr_frame *f UNUSED)
   printf ("system call %d!\n", syscall_id (f));
 #endif
   thread_exit ();
+}
+
+static int 
+exec_executor (void *args)
+{
+  PANIC ("syscall exec is not implemented");
+  return 0;
+} 
+
+static int 
+wait_executor (void *args)
+{
+  PANIC ("syscall wait is not implemented");
+  return 0;
+}
+
+static int 
+create_executor (void *args)
+{
+  PANIC ("syscall create is not implemented");
+  return 0;
+}
+
+static int 
+remove_executor (void *args)
+{
+  PANIC ("syscall remove is not implemented");
+  return 0;
+}
+static int 
+open_executor (void *args) 
+{
+  PANIC ("syscall open is not implemented");
+  return 0;
+}
+
+static int 
+filesize_executor (void *args)
+{
+  PANIC ("syscall filesize is not implemented");
+  return 0;
+}
+
+static int 
+read_executor (void *args)
+{
+  PANIC ("syscall read is not implemented");
+  return 0;
+}
+
+static int 
+write_executor (void *args)
+{
+  struct thread *cur = thread_current ();
+
+  unsigned int bytes;
+  /* parameters */
+  char *ubuf;
+  unsigned int len;
+  int fd;
+
+  /* parse params(for now, assume fd == 1) */
+  bytes = copy_from_user (cur->pagedir, args, &fd, sizeof (fd));
+  if (bytes != sizeof (fd)) {
+    return -1;
+  }
+  bytes = copy_from_user (cur->pagedir, args + 4, &ubuf, sizeof (ubuf));
+  if (bytes != sizeof (ubuf)) {
+    return -1;
+  }
+  bytes = copy_from_user (cur->pagedir, args + 8, &len, sizeof (len));
+  if (bytes != sizeof (len)) {
+    return -1;
+  }
+
+  /* make a kernel buffer, and print to console */
+  if (len == 0) {
+    return 0;
+  }
+  char *kbuf = (char *) malloc (len + 1);
+  if (kbuf == NULL) {
+    return -1;
+  }
+  kbuf[len] = '\0';
+
+  unsigned ret = copy_from_user (cur->pagedir, ubuf, kbuf, len);
+  if (fd == 1) {
+    printf ("%s", kbuf);
+  } else {
+    PANIC ("not support writing to file now");
+  }
+  free (kbuf);
+
+  return ret;
 }
