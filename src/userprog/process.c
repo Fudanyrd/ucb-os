@@ -1,5 +1,6 @@
 #include "userprog/process.h"
 #include <debug.h>
+#include <list.h>
 #include <inttypes.h>
 #include <round.h>
 #include <stdio.h>
@@ -89,8 +90,23 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  for (;;) {}
-  return -1;
+  if (child_tid == TID_ERROR) {
+    return -1;
+  }
+
+  /* turn of interrupt?? */
+  struct thread *cur = thread_current ();
+  enum intr_level old_level = intr_disable ();
+  /* Use the ticks member to record the process cur is waiting */
+  cur->ticks = child_tid;
+  list_push_back (&waiting_process, &cur->elem);
+  thread_block ();
+  intr_set_level (old_level);
+
+  /* How do I get the return value of child_tid? */
+  int ret = cur->ticks;
+  cur->ticks = 0;
+  return ret;
 }
 
 /** Free the current process's resources. */
@@ -99,6 +115,26 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+
+  /* Unblock waiting threads in the list */
+  struct thread *th;
+  struct list_elem *e;
+  struct list_elem *next;
+  if (!list_empty (&waiting_process)) {
+    for (e = list_begin (&waiting_process); e != list_end (&waiting_process);
+         e = next) {
+      next = list_next (e);
+      th = list_entry (e, struct thread, elem);
+      if ((int)th->ticks == cur->tid) {
+        /* remove from the list; unblock */
+        list_remove (e);
+        thread_unblock (th);
+
+        /* set the exit code! (see syscall.c: exit_executor!) */
+        th->ticks = cur->ticks;
+      }
+    }
+  }
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -133,7 +169,7 @@ process_activate (void)
      interrupts. */
   tss_update ();
 }
-
+
 /** We load ELF binaries.  The following definitions are taken
    from the ELF specification, [ELF1], more-or-less verbatim.  */
 
@@ -382,7 +418,7 @@ load (char *file_name, void (**eip) (void), void **esp)
   file_close (file);
   return success;
 }
-
+
 /** load() helpers. */
 
 static bool install_page (void *upage, void *kpage, bool writable);
