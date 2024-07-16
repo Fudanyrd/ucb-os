@@ -328,7 +328,7 @@ load (char *file_name, void (**eip) (void), void **esp)
   /* Parse params of the program */
   char *argp = (char *)(PHYS_BASE - fn_len - 1);
   int args = 0;              /**< number of args. */
-  char *argv[10];            /**< my implementation support up to 10 args. */
+  char *argv[MAX_ARGS];      /**< my implementation support up to 10 args. */
   bool is_start = true;      /**< is it the start of a "token"? */
   for (i = 0; i <= fn_len; ++i) 
     {
@@ -357,10 +357,10 @@ load (char *file_name, void (**eip) (void), void **esp)
   *(char **)sp = NULL;
   for (i = args - 1; i >= 0; --i) {
     sp -= 4; 
-    *(char **)sp = argv[i];
+    *(char **)sp = argv[i];  /**< argv[i] */
   }
   sp -= 4;
-  *(char **)sp = argv[0];    /**< argv */
+  *(char **)sp = (sp + 4);   /**< argv */
   sp -= 4;
   *(int *)sp = args;         /**< args */
   sp -= 4;
