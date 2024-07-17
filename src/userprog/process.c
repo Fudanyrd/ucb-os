@@ -659,3 +659,43 @@ fdfree (int fd)
   m->ofile[fd] = NULL;
   return 0;
 }
+
+/** Seek a position of a given fd */
+int 
+fdseek (int fd, unsigned int pos)
+{
+  /** get the index in the array */
+  fd -= 2;
+  if (fd < 0 || fd >= MAX_FILE) {
+    /** invalid fd */
+    return -1;
+  }
+
+  struct process_meta *m = *(struct process_meta **)(PHYS_BASE - 4);
+  if (m->ofile[fd] == NULL) {
+    return -1;
+  }
+
+  /** seek the file */
+  file_seek (m->ofile[fd], pos);
+  return 0;
+}
+
+/** Tell the position of a given fd */
+int
+fdtell (int fd)
+{
+  fd -= 2;
+  if (fd < 0 || fd >= MAX_FILE) {
+    /** invalid fd */
+    return -1;
+  }
+
+  struct process_meta *m = *(struct process_meta **)(PHYS_BASE - 4);
+  if (m->ofile[fd] == NULL) {
+    return -1;
+  }
+
+  /** seek the file */
+  return file_tell (m->ofile[fd]);
+}

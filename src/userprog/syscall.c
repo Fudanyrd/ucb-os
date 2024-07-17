@@ -518,18 +518,49 @@ write_executor (void *args)
   return ret;
 }
 
-static int 
-seek_executor (void *args)
+static int
+tell_executor (void *args)
 {
-  PANIC ("syscall seek is not implemented");
-  return 0;
+  /** Signature:
+     unsigned tell (int fd); */
+  int fd;
+  unsigned bytes;
+  struct thread *cur = thread_current ();
+
+  /** parse args */
+  bytes = copy_from_user (cur->pagedir, args, &fd, sizeof (fd));
+  if (bytes != sizeof (fd) || fd < 2) {
+    /** do not support Console IO */
+    return -1;
+  }
+
+  /** execute */
+  return fdtell (fd);
 }
 
 static int 
-tell_executor (void *args)
+seek_executor (void *args)
 {
-  PANIC ("syscall tell is not implemented");
-  return 0;
+  /** Signature:
+     void seek (int fd, unsigned position); */
+  int fd;
+  unsigned pos;
+  unsigned bytes;
+  struct thread *cur = thread_current ();
+
+  /** parse args */
+  bytes = copy_from_user (cur->pagedir, args, &fd, sizeof (fd));
+  if (bytes != sizeof (fd) || fd < 2) {
+    /** do not support Console IO */
+    return -1;
+  }
+  bytes = copy_from_user (cur->pagedir, args + 4, &pos, sizeof (pos));  
+  if (bytes != sizeof (pos)) {
+    return -1;
+  }
+
+  /** execute */
+  return fdseek (fd, pos);
 }
 
 static int 

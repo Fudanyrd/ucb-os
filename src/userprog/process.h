@@ -22,6 +22,8 @@ void process_activate (void);
 
 int fdalloc (void);
 int fdfree (int);
+int fdseek (int, unsigned int);
+int fdtell (int);
 struct file *filealloc (const char *fn);
 
 #endif /**< userprog/process.h */
