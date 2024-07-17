@@ -1,6 +1,7 @@
 cat
 cmp
 cp
+crrm
 echo
 exit
 fio

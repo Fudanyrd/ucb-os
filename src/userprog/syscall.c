@@ -1,5 +1,6 @@
 #include "devices/shutdown.h"
 #include "filesys/file.h"
+#include "filesys/filesys.h"
 #include "mode.h"
 #include "userprog/pagedir.h"
 #include "process.h"
@@ -331,8 +332,28 @@ wait_executor (void *args)
 static int 
 create_executor (void *args)
 {
-  PANIC ("syscall create is not implemented");
-  return 0;
+  /** Note: syscall prototype:
+    bool create (const char *file, unsigned initial_size);
+   */
+  char kbuf[16];
+  struct thread *cur = thread_current ();
+
+  /* parse args */
+  char *uaddr;
+  unsigned int init_sz;
+  unsigned int bytes;
+  bytes = copy_from_user (cur->pagedir, args, &uaddr, sizeof (uaddr));
+  if (bytes != sizeof (uaddr)) {
+    return -1;
+  }
+  cpstr_from_user (cur->pagedir, uaddr, kbuf);
+  bytes = copy_from_user (cur->pagedir, args + 4, &init_sz, sizeof (init_sz));
+  if (bytes != sizeof (init_sz)) {
+    return -1;
+  }
+
+  /* execute */
+  return filesys_create (kbuf, init_sz) ? 0 : -1;
 }
 
 static int 
