@@ -359,8 +359,22 @@ create_executor (void *args)
 static int 
 remove_executor (void *args)
 {
-  PANIC ("syscall remove is not implemented");
-  return 0;
+  /** Note of syscall prototypes:
+    bool remove (const char *file); */
+  char kbuf[16];
+  struct thread *cur = thread_current ();
+
+  /* parse args */
+  char *uaddr;
+  unsigned int bytes;
+  bytes = copy_from_user (cur->pagedir, args, &uaddr, sizeof (uaddr));
+  if (bytes != sizeof (uaddr)) {
+    return -1;
+  }
+  cpstr_from_user (cur->pagedir, uaddr, kbuf);
+
+  /* execute */
+  return filesys_remove (kbuf) ? 0 : -1;
 }
 
 /** Returns file descriptor if success; -1 on failure */
@@ -598,5 +612,5 @@ close_executor (void *args)
   }
 
   /* close the file descriptor */
-  fdfree (fd);
+  return fdfree (fd);
 }

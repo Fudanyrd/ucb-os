@@ -44,8 +44,21 @@ int main (int argc, char **argv) {
   /* check the content read */
   write (1, buf, len);
   printf ("\n");
+  close (fd);
+  
+  /* remove and try open(should fail) */
+  if (remove (fn) < 0) {
+    exit (6);
+  }
+  fd = open (fn);
+  if (fd >= 0) {
+    exit (7);
+  } 
   
   /* OK */
   close (fd);
   exit (0);
+
+  /* you may want to manually check status of file system,
+    e.g. use "cat" */
 }
