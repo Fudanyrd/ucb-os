@@ -1,4 +1,5 @@
 #include "devices/shutdown.h"
+#include "filesys/file.h"
 #include "mode.h"
 #include "userprog/pagedir.h"
 #include "process.h"
@@ -78,6 +79,47 @@ copy_from_user (uint32_t *pagetable, void *uaddr, void *kbuf,
     }
 
   return bytes - left;
+}
+
+/** Copy a string from user(i.e. until meet character '\0').
+ * @param pagetable pagetable to lookup
+ * @param uaddr start of user address
+ * @param kbuf kernel buffer
+ */
+static void
+cpstr_from_user (uint32_t *pagetable, char *uaddr, char *kbuf)
+{
+  /* validate parameters */
+  ASSERT (pagetable != NULL && is_user_vaddr(uaddr) && kbuf != NULL);
+
+  /* Once loopup a page, and copy only relevant part. */
+  char *ptr = pg_round_down (uaddr);  /**< page-aligned address */
+  unsigned int pgleft;        /**< bytes left in a page */
+  char ch;
+  for (; ptr < PHYS_BASE; ) 
+    {
+      void *kaddr = pagedir_get_page (pagetable, ptr);
+      if (kaddr == NULL) {
+        /* encounter page fault, abort(else will crash!) */
+        return;
+      }
+
+      kaddr += uaddr - ptr;
+      pgleft = PGSIZE - (uaddr - ptr);
+
+      /* copy until '\0' or end of page is met. */
+      for (unsigned i = 0; i < pgleft; ++i) {
+        *kbuf = *uaddr;
+        if (*kbuf == '\0') {
+          return;
+        }
+        ++kbuf;   ++uaddr;
+      }
+
+      /* look into next page; update uaddr */
+      ptr += PGSIZE;
+      uaddr = ptr;
+    }
 }
 
 /** Copy to user buffer. 
@@ -292,11 +334,46 @@ remove_executor (void *args)
   PANIC ("syscall remove is not implemented");
   return 0;
 }
+
+/** Returns file descriptor if success; -1 on failure */
 static int 
 open_executor (void *args) 
 {
-  PANIC ("syscall open is not implemented");
-  return 0;
+  char kbuf[16];  /**< file name is at most 14 bytes */
+  struct thread *cur = thread_current ();
+
+  /* parse arguments */
+  unsigned int len;
+  unsigned int uaddr;  /**< user string addr */
+  len = copy_from_user (cur->pagedir, args, &uaddr, sizeof (uaddr));
+  if (len != sizeof (uaddr)) {
+    return -1;
+  }
+  cpstr_from_user (cur->pagedir, (void *)uaddr, kbuf);
+#ifdef TEST
+  /**< test the functionality of cpstr_from_user. */
+  printf ("open_executor receive %s\n", kbuf);
+#endif
+  /* Allocate file descriptor(cheaper) */
+  int ret = fdalloc ();
+  if (ret == -1) {
+    /* oops, fail! */
+    return -1;
+  }
+
+  /* Allocate file object(expensive!) */
+  struct file *fobj = filealloc (kbuf);
+  if (fobj == NULL) {
+    /* oops, fail! */
+    return -1;
+  }
+
+  /* update process meta */
+  struct process_meta *m = *(struct process_meta **)(PHYS_BASE - 4);
+  m->ofile[ret - 2] = fobj;
+
+  /* Success! */
+  return ret;
 }
 
 static int 

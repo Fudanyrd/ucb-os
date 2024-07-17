@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "filesys/file.h"
+#include "filesys/filesys.h"
 #include "userprog/gdt.h"
 #include "userprog/mode.h"
 #include "userprog/pagedir.h"
@@ -115,6 +117,14 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+
+  /* Free the memory used by metadata */
+  struct process_meta **mpp = PHYS_BASE - 4;
+#ifdef TEST
+  /**< make sure the right block is freed */
+  printf ("free meta addr %x\n", *mpp);
+#endif
+  free (*mpp);
 
   /* Unblock waiting threads in the list */
   struct thread *th;
@@ -361,8 +371,22 @@ load (char *file_name, void (**eip) (void), void **esp)
   if (!setup_stack (esp))
     goto done;
 
+  /* Set up process meta */
+  ASSERT (sizeof (void *) == 4);
+  struct process_meta *mpt = malloc (sizeof (struct process_meta));
+  if (mpt == NULL) {
+    /* Oops, fail */
+    goto done;
+  }
+#ifdef TEST
+  printf ("allocate block %x for meta\n", mpt);
+#endif
+
+  /* Store meta pointer at top of stack. */
+  *(struct process_meta **)(PHYS_BASE -4) = mpt;
+
   /* Parse params of the program */
-  char *argp = (char *)(PHYS_BASE - fn_len - 1);
+  char *argp = (char *)(PHYS_BASE - fn_len - 5);
   int args = 0;              /**< number of args. */
   char *argv[MAX_ARGS];      /**< my implementation support up to 10 args. */
   bool is_start = true;      /**< is it the start of a "token"? */
@@ -402,6 +426,10 @@ load (char *file_name, void (**eip) (void), void **esp)
   sp -= 4;
   *(int *)sp = 0;            /**< return address */
   *esp = sp;                 /**< esp */
+
+  /* Set the member of meta */
+  mpt->argv = argv[0];
+  memset (mpt->ofile, 0, sizeof (mpt->ofile));
 
 #ifdef TEST
   printf ("After passing, esp is %x.\n", (unsigned)sp);
@@ -565,4 +593,35 @@ install_page (void *upage, void *kpage, bool writable)
      address, then map our page there. */
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
+}
+
+/** Allocate a file descriptor. Returns -1 if not found */
+int 
+fdalloc (void)
+{
+  struct process_meta *m = *(struct process_meta **)(PHYS_BASE - 4);
+  int fd = -1;
+  for (int i = 0; i < MAX_FILE; ++i)
+    {
+      if (m->ofile[i] == 0) {
+        /* file descriptor 0, 1 are used 
+          for console IO. */
+        fd = i + 2;
+        break;
+      }
+    }
+  return fd; 
+}
+
+/** Allocate file struct */
+struct file *
+filealloc (const char *fn)
+{
+  struct inode *in = filesys_open (fn);
+  if (in == NULL) {
+    return NULL;
+  }
+
+  struct file *ret = file_open (in);
+  return ret;
 }

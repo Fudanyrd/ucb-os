@@ -3,6 +3,7 @@ cmp
 cp
 echo
 exit
+fio
 halt
 hex-dump
 ls
