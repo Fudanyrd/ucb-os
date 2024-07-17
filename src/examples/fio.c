@@ -26,5 +26,8 @@ int main (int argc, char **argv) {
       write (dd, buf, n);
     }
 
+  /** Just close one file to detect not-close-on-exit or
+     double-close-on-exit error. */
+  close (fd);
   exit (fd < 0);
 }

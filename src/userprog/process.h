@@ -21,6 +21,7 @@ void process_exit (void);
 void process_activate (void);
 
 int fdalloc (void);
+int fdfree (int);
 struct file *filealloc (const char *fn);
 
 #endif /**< userprog/process.h */

@@ -118,6 +118,22 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
+  /* Close all files associated with the program */
+#ifdef TEST
+  int closed = 0;  /**< number of files auto closed */
+  for (int i = 0; i < MAX_FILE; ++i) {
+    if (fdfree (i + 2) == 0) {
+      closed++;
+    }
+  }
+  /** check that we have closed right number of files */
+  printf ("automatically closed %d file(s)\n", closed);
+#else
+  for (int i = 0; i < MAX_FILE; ++i) {
+    fdfree (i + 2);
+  }
+#endif
+
   /* Free the memory used by metadata */
   struct process_meta **mpp = PHYS_BASE - 4;
 #ifdef TEST
@@ -619,4 +635,27 @@ filealloc (const char *fn)
 {
   struct file *ret = filesys_open (fn);
   return ret;
+}
+
+/** Free a file descriptor for future use(close the file if opened) */
+int
+fdfree (int fd)
+{
+  /** get the index in the array */
+  fd -= 2;
+  if (fd < 0 || fd >= MAX_FILE) {
+    /** invalid fd */
+    return -1;
+  }
+
+  struct process_meta *m = *(struct process_meta **)(PHYS_BASE - 4);
+  if (m->ofile[fd] == NULL) {
+    /* file not exist or already closed */
+    return -1;
+  }
+
+  /** close the file */
+  file_close (m->ofile[fd]);
+  m->ofile[fd] = NULL;
+  return 0;
 }

@@ -249,7 +249,8 @@ exit_executor (void *args)
   return 0;
 }
 
-/** Other syscall executors */
+/** Other syscall executors(see lib/user/syscall.h) */
+static int halt_executor (void *args);
 static int exit_executor (void *args);
 static int exec_executor (void *args);
 static int wait_executor (void *args);
@@ -259,6 +260,9 @@ static int open_executor (void *args);
 static int filesize_executor (void *args);
 static int read_executor (void *args);
 static int write_executor (void *args);
+static int seek_executor (void *args);
+static int tell_executor (void *args);
+static int close_executor (void *args);
 
 /** list of implemented system calls */
 static syscall_executor_t syscall_executors[] = 
@@ -273,6 +277,9 @@ static syscall_executor_t syscall_executors[] =
     [SYS_FILESIZE] filesize_executor,
     [SYS_READ] read_executor,
     [SYS_WRITE] write_executor,
+    [SYS_SEEK] seek_executor,
+    [SYS_TELL] tell_executor,
+    [SYS_CLOSE] close_executor,
   };
 
 /** Number of implemented system calls(to detect overflow) */
@@ -509,4 +516,35 @@ write_executor (void *args)
   free (kbuf);
 
   return ret;
+}
+
+static int 
+seek_executor (void *args)
+{
+  PANIC ("syscall seek is not implemented");
+  return 0;
+}
+
+static int 
+tell_executor (void *args)
+{
+  PANIC ("syscall tell is not implemented");
+  return 0;
+}
+
+static int 
+close_executor (void *args)
+{
+  int fd;
+  unsigned bytes;
+  struct thread *cur = thread_current ();
+
+  /* parse arguments */
+  bytes = copy_from_user (cur->pagedir, args, &fd, sizeof (fd));
+  if (bytes != sizeof (fd)) {
+    return -1;
+  }
+
+  /* close the file descriptor */
+  fdfree (fd);
 }
