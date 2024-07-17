@@ -617,11 +617,6 @@ fdalloc (void)
 struct file *
 filealloc (const char *fn)
 {
-  struct inode *in = filesys_open (fn);
-  if (in == NULL) {
-    return NULL;
-  }
-
-  struct file *ret = file_open (in);
+  struct file *ret = filesys_open (fn);
   return ret;
 }

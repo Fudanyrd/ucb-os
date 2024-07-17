@@ -390,9 +390,9 @@ read_executor (void *args)
 
   unsigned int bytes;
   /* parameters */
-  char *ubuf;
-  unsigned int len;
-  int fd;
+  char *ubuf;        /**< user buffer */
+  unsigned int len;  /**< length of read */
+  int fd;            /**< file descriptor */
 
   /* parse params(for now, assume fd == 1) */
   bytes = copy_from_user (cur->pagedir, args, &fd, sizeof (fd));
@@ -431,7 +431,18 @@ read_executor (void *args)
       printf ("%c", kbuf[ret]);
     }
   } else {
-    PANIC ("not support writing to file now");
+    struct process_meta *m = *(struct process_meta **)(PHYS_BASE - 4);
+    fd -= 2;
+    if (fd >= MAX_FILE || m->ofile[fd] == NULL) {
+      /* invalid fd */
+      return -1;
+    }
+    int fret = file_read (m->ofile[fd], kbuf, len);
+    if (fret < 0) {
+      /* Warning: unsafe conversion from signed to unsigned */
+      return -1;
+    }
+    ret = fret;
   }
   ret = copy_to_user (cur->pagedir, kbuf, ubuf, ret);
   free (kbuf);
