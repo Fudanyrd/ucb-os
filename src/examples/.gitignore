@@ -4,6 +4,7 @@ cp
 echo
 exit
 fio
+fio2
 halt
 hex-dump
 ls
