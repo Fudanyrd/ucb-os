@@ -396,7 +396,7 @@ read_executor (void *args)
 
   /* parse params(for now, assume fd == 1) */
   bytes = copy_from_user (cur->pagedir, args, &fd, sizeof (fd));
-  if (bytes != sizeof (fd)) {
+  if (bytes != sizeof (fd) || fd < 0) {
     return -1;
   }
   bytes = copy_from_user (cur->pagedir, args + 4, &ubuf, sizeof (ubuf));
@@ -435,11 +435,13 @@ read_executor (void *args)
     fd -= 2;
     if (fd >= MAX_FILE || m->ofile[fd] == NULL) {
       /* invalid fd */
+      free (kbuf);
       return -1;
     }
     int fret = file_read (m->ofile[fd], kbuf, len);
     if (fret < 0) {
       /* Warning: unsafe conversion from signed to unsigned */
+      free (kbuf);
       return -1;
     }
     ret = fret;
@@ -463,7 +465,7 @@ write_executor (void *args)
 
   /* parse params(for now, assume fd == 1) */
   bytes = copy_from_user (cur->pagedir, args, &fd, sizeof (fd));
-  if (bytes != sizeof (fd)) {
+  if (bytes != sizeof (fd) || fd < 0) {
     return -1;
   }
   bytes = copy_from_user (cur->pagedir, args + 4, &ubuf, sizeof (ubuf));
@@ -489,7 +491,20 @@ write_executor (void *args)
   if (fd == 1) {
     printf ("%s", kbuf);
   } else {
-    PANIC ("not support writing to file now");
+    struct process_meta *m = *(struct process_meta **)(PHYS_BASE - 4);
+    fd -= 2;
+    if (fd >= MAX_FILE || m->ofile[fd] == NULL) {
+      /* invalid fd */
+      free (kbuf);
+      return -1;
+    }
+    int fret = file_write (m->ofile[fd], kbuf, len);
+    if (fret < 0) {
+      /* Warning: unsafe conversion from signed to unsigned */
+      free (kbuf);
+      return -1;
+    }
+    ret = fret;
   }
   free (kbuf);
 

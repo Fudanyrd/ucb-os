@@ -6,7 +6,10 @@ int main (int argc, char **argv) {
   /* file name */
   const char *fn = "fio.c";
   int fd = open (fn);
-  printf ("allocate fd = %d\n", fd);
+
+  const char *dst = "empty.txt";
+  int dd = open (dst);
+  printf ("allocate fd = %d, %d\n", fd, dd);
 
   if (fd < 0) {
     exit (1);
@@ -20,6 +23,7 @@ int main (int argc, char **argv) {
         break;
       }
       write (1, buf, n);
+      write (dd, buf, n);
     }
 
   exit (fd < 0);
