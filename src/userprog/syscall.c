@@ -82,13 +82,17 @@ copy_from_user (uint32_t *pagetable, void *uaddr, void *kbuf,
   return bytes - left;
 }
 
-/** Copy a string from user(i.e. until meet character '\0').
+/** Copy a string from user(i.e. until meet character '\0'). WARNING:
+ * this function requires you to handle error based on return value!
  * @param pagetable pagetable to lookup
  * @param uaddr start of user address
  * @param kbuf kernel buffer
+ * @param bufsz kernel buffer size
+ * @return 0: success, 1: (about to) overflow buffer, 2: page fault
  */
-static void
-cpstr_from_user (uint32_t *pagetable, char *uaddr, char *kbuf)
+static int 
+cpstr_from_user (uint32_t *pagetable, char *uaddr, char *kbuf, 
+                 unsigned int bufsz)
 {
   /* validate parameters */
   ASSERT (pagetable != NULL && is_user_vaddr(uaddr) && kbuf != NULL);
@@ -96,12 +100,13 @@ cpstr_from_user (uint32_t *pagetable, char *uaddr, char *kbuf)
   /* Once loopup a page, and copy only relevant part. */
   char *ptr = pg_round_down (uaddr);  /**< page-aligned address */
   unsigned int pgleft;        /**< bytes left in a page */
+  unsigned int bytes = 0;     /**< bytes write to kbuf */
   for (; ptr < PHYS_BASE; ) 
     {
       void *kaddr = pagedir_get_page (pagetable, ptr);
       if (kaddr == NULL) {
         /* encounter page fault, abort(else will crash!) */
-        return;
+        return 2;
       }
 
       kaddr += uaddr - ptr;
@@ -109,9 +114,14 @@ cpstr_from_user (uint32_t *pagetable, char *uaddr, char *kbuf)
 
       /* copy until '\0' or end of page is met. */
       for (unsigned i = 0; i < pgleft; ++i) {
+        if (bytes == bufsz) {
+          /* Overflow detected! */
+          return 1;
+        }
         *kbuf = *uaddr;
+        ++bytes;
         if (*kbuf == '\0') {
-          return;
+          return 0;
         }
         ++kbuf;   ++uaddr;
       }
@@ -120,6 +130,9 @@ cpstr_from_user (uint32_t *pagetable, char *uaddr, char *kbuf)
       ptr += PGSIZE;
       uaddr = ptr;
     }
+  
+  /* ok. */
+  return 0;
 }
 
 /** Copy to user buffer. 
@@ -330,7 +343,19 @@ exec_executor (void *args)
     return -1;
   }
   /** CAUTION: buffer overflow(may pass tests) */
-  cpstr_from_user (cur->pagedir, uaddr, buf);
+  int ret = cpstr_from_user (cur->pagedir, uaddr, buf, sizeof (buf));
+
+  /* Error handling */
+  switch (ret) {
+    case 1: {
+      /* Overflow */
+      return TID_ERROR;
+    }
+    case 2: {
+      /* page fault, no return */
+      process_terminate (-1);
+    }
+  }
   return process_execute (buf);
 } 
 
@@ -368,16 +393,24 @@ create_executor (void *args)
   unsigned int bytes;
   bytes = copy_from_user (cur->pagedir, args, &uaddr, sizeof (uaddr));
   if (bytes != sizeof (uaddr)) {
-    return -1;
+    return 0;
   }
-  cpstr_from_user (cur->pagedir, uaddr, kbuf);
+  bytes = cpstr_from_user (cur->pagedir, uaddr, kbuf, sizeof (kbuf));
+  switch (bytes) {
+    case 1: {
+      return 0;
+    }
+    case 2: {
+      process_terminate (-1);
+    }
+  }
   bytes = copy_from_user (cur->pagedir, args + 4, &init_sz, sizeof (init_sz));
   if (bytes != sizeof (init_sz)) {
-    return -1;
+    return 0;
   }
 
   /* execute */
-  return filesys_create (kbuf, init_sz) ? 0 : -1;
+  return (int) filesys_create (kbuf, init_sz);
 }
 
 static int 
@@ -393,12 +426,24 @@ remove_executor (void *args)
   unsigned int bytes;
   bytes = copy_from_user (cur->pagedir, args, &uaddr, sizeof (uaddr));
   if (bytes != sizeof (uaddr)) {
-    return -1;
+    return 0;
   }
-  cpstr_from_user (cur->pagedir, uaddr, kbuf);
+  int ret =cpstr_from_user (cur->pagedir, uaddr, kbuf, sizeof (kbuf));
+
+  /* Error handling */
+  switch (ret) {
+    case 1: {
+      /* file length exceed limit */
+      return 0;
+    }
+    case 2: {
+      /* page fault, terminate */
+      process_terminate (-1);
+    }
+  }
 
   /* execute */
-  return filesys_remove (kbuf) ? 0 : -1;
+  return filesys_remove (kbuf) ? 1 : 0;
 }
 
 /** Returns file descriptor if success; -1 on failure */
@@ -407,6 +452,7 @@ open_executor (void *args)
 {
   char kbuf[16];  /**< file name is at most 14 bytes */
   struct thread *cur = thread_current ();
+  int ret;
 
   /* parse arguments */
   unsigned int len;
@@ -415,13 +461,26 @@ open_executor (void *args)
   if (len != sizeof (uaddr)) {
     return -1;
   }
-  cpstr_from_user (cur->pagedir, (void *)uaddr, kbuf);
+  ret = cpstr_from_user (cur->pagedir, (void *)uaddr, kbuf, sizeof (kbuf));
+
+  /* Error handling */
+  switch (ret) {
+    case 1: {
+      /* file length exceed limit */
+      return -1;
+    }
+    case 2: {
+      /* page fault, terminate */
+      process_terminate (-1);
+    }
+  }
+
 #ifdef TEST
   /**< test the functionality of cpstr_from_user. */
   printf ("open_executor receive %s\n", kbuf);
 #endif
   /* Allocate file descriptor(cheaper) */
-  int ret = fdalloc ();
+  ret = fdalloc ();
   if (ret == -1) {
     /* oops, fail! */
     return -1;
@@ -495,9 +554,13 @@ read_executor (void *args)
       }
     }
   } else {
+    if (fd == 1) {
+      /* Read stdout??? IMPOSSIBLE! */
+      return -1;
+    }
     struct process_meta *m = *(struct process_meta **)(PHYS_BASE - 4);
     fd -= 2;
-    if (fd >= MAX_FILE || m->ofile[fd] == NULL) {
+    if (fd >= MAX_FILE || fd < 0 || m->ofile[fd] == NULL) {
       /* invalid fd */
       free (kbuf);
       return -1;
@@ -555,9 +618,13 @@ write_executor (void *args)
   if (fd == 1) {
     printf ("%s", kbuf);
   } else {
+    if (fd == 0) {
+      /* Write stdin ??? IMPOSSIBLE! */
+      return -1;
+    }
     struct process_meta *m = *(struct process_meta **)(PHYS_BASE - 4);
     fd -= 2;
-    if (fd >= MAX_FILE || m->ofile[fd] == NULL) {
+    if (fd >= MAX_FILE || fd < 0 || m->ofile[fd] == NULL) {
       /* invalid fd */
       free (kbuf);
       return -1;

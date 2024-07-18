@@ -185,6 +185,14 @@ process_exit (void)
     }
 }
 
+/* terminate an user program with exit code */
+void 
+process_terminate (int code)
+{
+  thread_current ()->ticks = code;
+  thread_exit ();
+}
+
 /** Sets up the CPU for running user code in the current
    thread.
    This function is called on every context switch. */
