@@ -5,7 +5,8 @@ SRCDIR = ..
 # and then add a name_SRC line that lists its source files.
 PROGS = cat cmp cp crrm echo exit fio fio2 halt hang hex-dump \
   ls mcat mcp mkdir pwd rm shell \
-	bubsort insult lineup matmult recursor parrot telseek
+	bubsort insult lineup matmult recursor parrot telseek \
+	zombie
 
 # Should work from project 2 onward.
 cat_SRC = cat.c
@@ -26,6 +27,7 @@ recursor_SRC = recursor.c
 rm_SRC = rm.c
 parrot_SRC = parrot.c
 telseek_SRC = telseek.c
+zombie_SRC = zombie.c
 
 # Should work in project 3; also in project 4 if VM is included.
 bubsort_SRC = bubsort.c

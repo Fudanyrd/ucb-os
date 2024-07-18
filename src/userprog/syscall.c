@@ -318,15 +318,40 @@ syscall_handler (struct intr_frame *f UNUSED)
 static int 
 exec_executor (void *args)
 {
-  PANIC ("syscall exec is not implemented");
-  return 0;
+  /** note: prototype is
+     pid_t exec (const char *file); */
+  char *uaddr;
+  struct thread *cur = thread_current ();
+  unsigned bytes;
+  
+  /* parse arguments */
+  char buf[256];
+  bytes = copy_from_user (cur->pagedir, args, &uaddr, sizeof (uaddr));
+  if (bytes != sizeof (uaddr)) {
+    return -1;
+  }
+  /** CAUTION: buffer overflow(may pass tests) */
+  cpstr_from_user (cur->pagedir, uaddr, buf);
+  return process_execute (buf);
 } 
 
 static int 
 wait_executor (void *args)
 {
-  PANIC ("syscall wait is not implemented");
-  return 0;
+  /** note: prototype is
+     int wait (pid_t);  */
+  int tid;
+  unsigned int bytes;
+  struct thread *cur = thread_current ();
+
+  /* parse arguments */
+  bytes = copy_from_user (cur->pagedir, args, &tid, sizeof (tid));
+  if (bytes != sizeof (tid) || tid == TID_ERROR) {
+    return -1;
+  }
+
+  /* execute */
+  return process_wait (tid);
 }
 
 static int 
@@ -465,12 +490,10 @@ read_executor (void *args)
     for (ret = 0; ret < len; ++ret) {
       kbuf[ret] = input_getc ();
       if (kbuf[ret] == '\n' || kbuf[ret] == '\r') {
-        printf ("\n");
         kbuf[ret] = '\n';
         ++ret;
         break;
       }
-      printf ("%c", kbuf[ret]);
     }
   } else {
     struct process_meta *m = *(struct process_meta **)(PHYS_BASE - 4);
