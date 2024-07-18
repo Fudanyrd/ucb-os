@@ -514,8 +514,20 @@ open_executor (void *args)
 static int 
 filesize_executor (void *args)
 {
-  PANIC ("syscall filesize is not implemented");
-  return 0;
+  /** note: prototype is
+     int filesize (int fd); */
+  struct thread *cur = thread_current ();
+  unsigned int bytes;
+  int fd;
+
+  /* Parse args */
+  bytes = copy_from_user (cur->pagedir, args, &fd, sizeof (fd));
+  if (bytes != sizeof (fd)) {
+    return -1;
+  }
+
+  /* execute */
+  return fdsize (fd);
 }
 
 static int 

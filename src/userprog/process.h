@@ -25,6 +25,7 @@ int fdalloc (void);
 int fdfree (int);
 int fdseek (int, unsigned int);
 int fdtell (int);
+int fdsize (int);
 struct file *filealloc (const char *fn);
 
 #endif /**< userprog/process.h */

@@ -712,3 +712,21 @@ fdtell (int fd)
   /** seek the file */
   return file_tell (m->ofile[fd]);
 }
+
+/** Returns the size of file associated with fd. */
+int 
+fdsize (int fd)
+{
+  fd -= 2;
+  if (fd < 0 || fd >= MAX_FILE) {
+    /** invalid fd */
+    return -1;
+  }
+
+  struct process_meta *m = *(struct process_meta **)(PHYS_BASE - 4);
+  if (m->ofile[fd] == NULL) {
+    return -1;
+  }
+
+  return file_length (m->ofile[fd]);
+}
