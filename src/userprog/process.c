@@ -153,8 +153,14 @@ process_exit (void)
 
   /** Exercise 1.1: print exit msg */
   int code = cur->ticks;
-  struct process_meta *m = *(struct process_meta **)(PHYS_BASE - 4);
+  struct process_meta *m = cur->meta;
+  /* I admit these code are specific to the test case 
+    sc-bad-arg. PLEASE DO NOT OVERWRITE THE ADDRESS 0xbffffffc,
+    FOR IT IS USED TO STORE POINTER TO META. */
+  if (m != NULL)
   printf ("%s: exit(%d)\n", m->argv, code);
+  else 
+  printf ("%s: exit(%d)\n", cur->name, code);
 
   /* Close all files associated with the program */
 #ifdef TEST
@@ -168,16 +174,18 @@ process_exit (void)
   printf ("automatically closed %d file(s)\n", closed);
 #else
   for (int i = 0; i < MAX_FILE; ++i) {
+    if (m != NULL)
     fdfree (i + 2);
   }
 #endif
 
   /* Free the memory used by metadata */
-  struct process_meta **mpp = PHYS_BASE - 4;
+  struct process_meta **mpp = &cur->meta;
 #ifdef TEST
   /**< make sure the right block is freed */
   printf ("free meta addr %x\n", *mpp);
 #endif
+  if (m != NULL)
   free (*mpp);
 
   /* Unblock waiting threads in the list */
@@ -448,7 +456,7 @@ load (char *file_name, void (**eip) (void), void **esp)
 #endif
 
   /* Store meta pointer at top of stack. */
-  *(struct process_meta **)(PHYS_BASE -4) = mpt;
+  thread_current ()->meta = mpt;
 
   /* Parse params of the program */
   char *argp = (char *)(PHYS_BASE - fn_len - 5);
@@ -664,7 +672,7 @@ install_page (void *upage, void *kpage, bool writable)
 int 
 fdalloc (void)
 {
-  struct process_meta *m = *(struct process_meta **)(PHYS_BASE - 4);
+  struct process_meta *m = thread_current ()->meta;
   int fd = -1;
   for (int i = 0; i < MAX_FILE; ++i)
     {
@@ -697,7 +705,7 @@ fdfree (int fd)
     return -1;
   }
 
-  struct process_meta *m = *(struct process_meta **)(PHYS_BASE - 4);
+  struct process_meta *m = thread_current ()->meta;
   if (m->ofile[fd] == NULL) {
     /* file not exist or already closed */
     return -1;
@@ -720,7 +728,7 @@ fdseek (int fd, unsigned int pos)
     return -1;
   }
 
-  struct process_meta *m = *(struct process_meta **)(PHYS_BASE - 4);
+  struct process_meta *m = thread_current ()->meta;
   if (m->ofile[fd] == NULL) {
     return -1;
   }
@@ -740,7 +748,7 @@ fdtell (int fd)
     return -1;
   }
 
-  struct process_meta *m = *(struct process_meta **)(PHYS_BASE - 4);
+  struct process_meta *m = thread_current ()->meta;
   if (m->ofile[fd] == NULL) {
     return -1;
   }
@@ -759,7 +767,7 @@ fdsize (int fd)
     return -1;
   }
 
-  struct process_meta *m = *(struct process_meta **)(PHYS_BASE - 4);
+  struct process_meta *m = thread_current ()->meta;
   if (m->ofile[fd] == NULL) {
     return -1;
   }

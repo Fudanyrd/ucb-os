@@ -111,6 +111,7 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /**< Page directory(page table). */
+    void *meta;                         /**< Pointer to metadat(on heap) */
 #endif
 
     /* Owned by thread.c. */

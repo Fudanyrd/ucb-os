@@ -274,7 +274,9 @@ exit_executor (void *args)
   struct thread *cur = thread_current ();
   int code = -1;  /**< exit code */
   unsigned ret = copy_from_user (cur->pagedir, args, &code, sizeof(int));
-  ASSERT (ret == sizeof(int));
+  if (ret != sizeof(int)) {
+    process_terminate (-1);
+  }
 #ifdef TEST
   printf ("system call exit got %x!\n", code);
 #endif
@@ -546,7 +548,7 @@ open_executor (void *args)
   }
 
   /* update process meta */
-  struct process_meta *m = *(struct process_meta **)(PHYS_BASE - 4);
+  struct process_meta *m = cur->meta;
   m->ofile[ret - 2] = fobj;
 
   /* Success! */
@@ -624,7 +626,7 @@ read_executor (void *args)
       /* Read stdout??? IMPOSSIBLE! */
       return -1;
     }
-    struct process_meta *m = *(struct process_meta **)(PHYS_BASE - 4);
+    struct process_meta *m = cur->meta;
     fd -= 2;
     if (fd >= MAX_FILE || fd < 0 || m->ofile[fd] == NULL) {
       /* invalid fd */
@@ -698,7 +700,7 @@ write_executor (void *args)
       /* Write stdin ??? IMPOSSIBLE! */
       return -1;
     }
-    struct process_meta *m = *(struct process_meta **)(PHYS_BASE - 4);
+    struct process_meta *m = cur->meta;
     fd -= 2;
     if (fd >= MAX_FILE || fd < 0 || m->ofile[fd] == NULL) {
       /* invalid fd */

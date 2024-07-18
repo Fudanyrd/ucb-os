@@ -708,6 +708,10 @@ init_thread (struct thread *t, const char *name, int priority)
   t->acquiring = NULL;
 #endif
 
+#ifdef USERPROG
+  t->meta = NULL;
+#endif
+
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
