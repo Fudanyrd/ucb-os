@@ -350,7 +350,8 @@ exec_executor (void *args)
   char buf[256];
   bytes = copy_from_user (cur->pagedir, args, &uaddr, sizeof (uaddr));
   if (bytes != sizeof (uaddr)) {
-    return -1;
+    /* Fatal: not able to fetch args. */
+    process_terminate (-1);
   }
   /** CAUTION: buffer overflow(may pass tests) */
   int ret = cpstr_from_user (cur->pagedir, uaddr, buf, sizeof (buf));
@@ -366,6 +367,28 @@ exec_executor (void *args)
       process_terminate (-1);
     }
   }
+
+  /* check file exists or not */
+  for (int i = 0; i < sizeof (buf); ++i) {
+    if (buf[i] == ' ') {
+      bytes = 1;
+      ret = i; 
+      break;
+    }
+    if (buf[i] == '\0') {
+      ret = i;
+      bytes = 0;
+      break;
+    }
+  }
+  buf[ret] = '\0'; 
+  struct file *fobj = filesys_open (buf);
+  if (fobj == NULL) {
+    return -1;
+  }
+  file_close (fobj);
+  if (bytes) 
+    buf[ret] = ' ';
   return process_execute (buf);
 } 
 
