@@ -87,6 +87,28 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
+/** Return the pointer to the thread tid, NULL if not found */
+struct thread *
+thread_lookup (tid_t tid)
+{
+  struct thread *th;
+  struct list_elem *e;
+
+  if (list_empty (&all_list)) {
+    return NULL;
+  }
+
+  for (e = list_begin (&all_list); e != list_end (&all_list); ) {
+    th = list_entry (e, struct thread, allelem);
+    if (th->tid == tid) {
+      return th;
+    }
+    e = list_next (e);
+  }
+
+  return NULL;
+}
+
 /** Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S

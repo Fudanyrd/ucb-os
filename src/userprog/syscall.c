@@ -227,8 +227,25 @@ syscall_id (struct intr_frame *f)
      "intr frame f is c010afb0, f->esp is bffffe88"
      obviosly intr-frame is in kernel space, and f->esp is in user space.
      Hence *(int *)f->esp is safe.
+
+     Well, I admit to have make a mistake in the comments above. 
+     child-bad program taught me that you should use safe way to 
+     access user memory.
    */
-  return *(int *)(f->esp);
+  if (!is_user_vaddr (f->esp)) {
+    thread_current ()->ticks = -1;
+    thread_exit ();
+  }
+  int id;
+  struct thread *cur = thread_current ();
+  unsigned int bytes;
+  bytes = copy_from_user (cur->pagedir, f->esp, &id, sizeof (id));
+  if (bytes != sizeof (id)) {
+    /** kill */
+    thread_current ()->ticks = -1;
+    thread_exit ();
+  }
+  return id;
 }
 
 /** From interrupt frame, locate the argument(s) to syscall.
@@ -335,6 +352,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   ASSERT (is_user_vaddr (f->esp));
   printf ("system call %d!\n", syscall_id (f));
 #endif
+  thread_current ()->ticks = -1;
   thread_exit ();
 }
 

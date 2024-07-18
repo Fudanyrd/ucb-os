@@ -20,6 +20,7 @@ int process_wait (tid_t);
 void process_exit (void);
 void process_terminate (int);
 void process_activate (void);
+void process_unblock (tid_t, int);
 
 int fdalloc (void);
 int fdfree (int);

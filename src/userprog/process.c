@@ -99,6 +99,14 @@ process_wait (tid_t child_tid UNUSED)
   /* turn of interrupt?? */
   struct thread *cur = thread_current ();
   enum intr_level old_level = intr_disable ();
+
+  /* Scan the thread list for the process */
+  struct thread *th = thread_lookup (child_tid);
+  if (th == NULL || th->status == THREAD_DYING || th->tid == cur->tid) {
+    intr_set_level (old_level);
+    return -1;
+  }
+
   /* Use the ticks member to record the process cur is waiting */
   cur->ticks = child_tid;
   list_push_back (&waiting_process, &cur->elem);
@@ -109,6 +117,31 @@ process_wait (tid_t child_tid UNUSED)
   int ret = cur->ticks;
   cur->ticks = 0;
   return ret;
+}
+
+/** Unblock the thread that is waiting for tid to 
+  complete. */
+void 
+process_unblock (tid_t tid, int code)
+{
+  struct thread *th;
+  struct list_elem *e;
+  struct list_elem *next;
+  if (!list_empty (&waiting_process)) {
+    for (e = list_begin (&waiting_process); e != list_end (&waiting_process);
+         e = next) {
+      next = list_next (e);
+      th = list_entry (e, struct thread, elem);
+      if ((int)th->ticks == tid) {
+        /* remove from the list; unblock */
+        list_remove (e);
+        thread_unblock (th);
+
+        /* set the exit code! (see syscall.c: exit_executor!) */
+        th->ticks = code;
+      }
+    }
+  }
 }
 
 /** Free the current process's resources. */
@@ -318,6 +351,9 @@ load (char *file_name, void (**eip) (void), void **esp)
 
   /* Open executable file. */
   file = filesys_open (file_name);
+
+  /** Exercise 5.1: deny write to executable */
+  file_deny_write (file);
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
