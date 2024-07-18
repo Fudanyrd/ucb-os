@@ -24,16 +24,21 @@ struct list waiting_process;
  * @param pagetable pagetable to lookup.
  * @param uaddr start of user address to copy from.
  * @param kbuf kernel buffer.
+ * @return 0x80000000 | bytes if page fault.
  */
 static unsigned int
 copy_from_user (uint32_t *pagetable, void *uaddr, void *kbuf, 
                 unsigned int bytes) 
 {
   /* validate parameters */
-  ASSERT (pagetable != NULL && is_user_vaddr(uaddr) && kbuf != NULL);
+  ASSERT (pagetable != NULL && kbuf != NULL);
   if (bytes == 0U) {
     return 0U;
   }
+  if (!is_user_vaddr (uaddr)) {
+    /* Page fault immediately */
+    return 0x80000000;
+  } 
 
   /* Once loopup a page, and copy only relevant part. */
   void *ptr = pg_round_down (uaddr);  /**< page-aligned address */
@@ -44,7 +49,7 @@ copy_from_user (uint32_t *pagetable, void *uaddr, void *kbuf,
       void *kaddr = pagedir_get_page (pagetable, ptr);
       if (kaddr == NULL) {
         /* encounter page fault, abort(else will crash!) */
-        break;
+        return (bytes - left) | 0x80000000;
       }
 
       kaddr += uaddr - ptr;
@@ -139,16 +144,21 @@ cpstr_from_user (uint32_t *pagetable, char *uaddr, char *kbuf,
  * @param pagetable user page table
  * @param kbuf start of kernel address
  * @param uaddr user buffer
- * @return number of bytes copied to user buffer
+ * @return number of bytes copied to user buffer, 0x80000000 | bytes
+ * on page fault(then the program should terminate with -1).
  */
 static unsigned int
 copy_to_user (uint32_t *pagetable, void *kbuf, void *uaddr, 
               unsigned int bytes)
 {
   /* validate parameters */
-  ASSERT (pagetable != NULL && is_user_vaddr(uaddr) && kbuf != NULL);
+  ASSERT (pagetable != NULL && kbuf != NULL);
   if (bytes == 0U) {
     return 0U;
+  }
+  if (!is_user_vaddr (uaddr)) {
+    /* page fault */
+    return 0x80000000;
   }
 
   /* Once loopup a page, and copy only relevant part. */
@@ -160,7 +170,7 @@ copy_to_user (uint32_t *pagetable, void *kbuf, void *uaddr,
       void *kaddr = pagedir_get_page (pagetable, ptr);
       if (kaddr == NULL) {
         /* encounter page fault, abort(else will crash!) */
-        break;
+        return 0x80000000 | (bytes - left);
       }
 
       kaddr += uaddr - ptr;
@@ -511,6 +521,8 @@ filesize_executor (void *args)
 static int 
 read_executor (void *args)
 {
+  /** note: prototype of write is 
+     int read (int fd, void *buffer, unsigned length); */
   struct thread *cur = thread_current ();
 
   unsigned int bytes;
@@ -575,6 +587,10 @@ read_executor (void *args)
   }
   ret = copy_to_user (cur->pagedir, kbuf, ubuf, ret);
   free (kbuf);
+  if (ret & 0x80000000) {
+    /* page fault detected! */
+    process_terminate (-1);
+  }
 
   return ret;
 }
@@ -582,6 +598,8 @@ read_executor (void *args)
 static int 
 write_executor (void *args)
 {
+  /** note: prototype of write is 
+     int write (int fd, void *buffer, unsigned length); */
   struct thread *cur = thread_current ();
 
   unsigned int bytes;
@@ -615,6 +633,10 @@ write_executor (void *args)
   kbuf[len] = '\0';
 
   unsigned ret = copy_from_user (cur->pagedir, ubuf, kbuf, len);
+  if (ret & 0x80000000) {
+    /* page fault encountered */
+    process_terminate (-1);
+  }
   if (fd == 1) {
     printf ("%s", kbuf);
   } else {
