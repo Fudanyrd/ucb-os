@@ -13,6 +13,7 @@ struct process_meta
     char           *argv;       /**< Position of argv */
     struct file    *ofile[MAX_FILE];
                                 /**< File descriptor table */
+    struct file    *executable; /**< Executable; must close on process_exit. */
   };
 
 tid_t process_execute (const char *file_name);

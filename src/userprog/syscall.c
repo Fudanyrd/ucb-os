@@ -707,6 +707,10 @@ write_executor (void *args)
       free (kbuf);
       return -1;
     }
+    if (!file_writable (m->ofile[fd])) {
+      free (kbuf);
+      return 0;
+    }
     int fret = file_write (m->ofile[fd], kbuf, len);
     if (fret < 0) {
       /* Warning: unsafe conversion from signed to unsigned */

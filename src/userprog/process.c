@@ -185,6 +185,8 @@ process_exit (void)
   /**< make sure the right block is freed */
   printf ("free meta addr %x\n", *mpp);
 #endif
+  if (m != NULL && m->executable != NULL)  /**< close the executable */
+  file_close (m->executable);
   if (m != NULL)
   free (*mpp);
 
@@ -360,7 +362,6 @@ load (char *file_name, void (**eip) (void), void **esp)
   /* Open executable file. */
   file = filesys_open (file_name);
 
-  /** Exercise 5.1: deny write to executable */
   file_deny_write (file);
   if (file == NULL) 
     {
@@ -451,6 +452,9 @@ load (char *file_name, void (**eip) (void), void **esp)
     /* Oops, fail */
     goto done;
   }
+
+  /** Exercise 5.1: deny write to executable */
+  mpt->executable = file;
 #ifdef TEST
   printf ("allocate block %x for meta\n", mpt);
 #endif
@@ -516,7 +520,6 @@ load (char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
   return success;
 }
 
