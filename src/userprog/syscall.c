@@ -179,6 +179,7 @@ copy_to_user (uint32_t *pagetable, void *kbuf, void *uaddr,
       if (pgleft < left) {
         memmove (kaddr, kbuf, pgleft);
         left -= pgleft;
+        kbuf += pgleft;
       } else {
         memmove (kaddr, kbuf, left);
         left = 0;
