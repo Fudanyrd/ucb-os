@@ -13,4 +13,6 @@
 /**< Maximum open file */
 #define MAX_FILE 32
 
+#undef TEST
+
 #endif /**< userprog/mode.h */

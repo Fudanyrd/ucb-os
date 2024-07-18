@@ -118,6 +118,11 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
+  /** Exercise 1.1: print exit msg */
+  int code = cur->ticks;
+  struct process_meta *m = *(struct process_meta **)(PHYS_BASE - 4);
+  printf ("%s: exit(%d)\n", m->argv, code);
+
   /* Close all files associated with the program */
 #ifdef TEST
   int closed = 0;  /**< number of files auto closed */

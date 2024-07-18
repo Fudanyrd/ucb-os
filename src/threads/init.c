@@ -330,7 +330,8 @@ run_task (char **argv)
 #else
   run_test (task);
 #endif
-  printf ("Execution of '%s' complete with stat %x.\n", task, exitcode);
+  /* The tests taught me a lesson: DO NOT MODIFY OUTPUTS! */
+  printf ("Execution of '%s' complete.\n", task);
 }
 
 /** Executes all of the actions specified in ARGV[]

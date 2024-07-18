@@ -96,7 +96,6 @@ cpstr_from_user (uint32_t *pagetable, char *uaddr, char *kbuf)
   /* Once loopup a page, and copy only relevant part. */
   char *ptr = pg_round_down (uaddr);  /**< page-aligned address */
   unsigned int pgleft;        /**< bytes left in a page */
-  char ch;
   for (; ptr < PHYS_BASE; ) 
     {
       void *kaddr = pagedir_get_page (pagetable, ptr);
