@@ -19,6 +19,9 @@
 /**< Maximum number of processes */
 #define NPROC 1024
 
+/**< Number of syscall hash buckets */
+#define SC_HASH_BUCKETS 13
+
 #undef TEST
 
 #endif /**< userprog/mode.h */

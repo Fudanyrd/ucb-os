@@ -11,6 +11,7 @@
 #include "userprog/gdt.h"
 #include "userprog/mode.h"
 #include "userprog/pagedir.h"
+#include "userprog/syscall.h"
 #include "userprog/tss.h"
 #include "filesys/directory.h"
 #include "filesys/file.h"
@@ -117,11 +118,14 @@ process_wait (tid_t child_tid UNUSED)
   /* Scan the thread list for the process */
   struct thread *th = thread_lookup (child_tid);
   if (th == NULL || th->status == THREAD_DYING || th->tid == cur->tid) {
-    intr_set_level (old_level);
-    if (child_tid >= NPROC)
+    struct sc_hash_entry *entr = sc_ht_lookup (child_tid);
+    if (entr == NULL) {
+      intr_set_level (old_level);
       return -1;
-    int code = retvals[child_tid];
-    retvals[child_tid] = -1;
+    }
+    int code = entr->val;
+    sc_ht_rm (child_tid);
+    intr_set_level (old_level);
     return code;
   }
 
@@ -179,7 +183,10 @@ process_exit (void)
   printf ("%s: exit(%d)\n", m->argv, code);
   else 
   printf ("%s: exit(%d)\n", cur->name, code);
-  retvals[cur->tid] = code;
+  enum intr_level old_level;
+  old_level = intr_disable ();
+  sc_ht_put (cur->tid, code); 
+  intr_set_level (old_level);
 
   /* Close all files associated with the program */
 #ifdef TEST

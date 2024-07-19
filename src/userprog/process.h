@@ -6,7 +6,6 @@
 
 extern struct list waiting_process;
 extern struct list exec_process;
-extern int retvals[NPROC];
 
 struct file;
 /** Metadata of a user process(put on stack) */

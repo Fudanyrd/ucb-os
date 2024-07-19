@@ -17,6 +17,79 @@
 
 static void syscall_handler (struct intr_frame *);
 
+/** Look up a key in the htable, 
+   returns the pointer to that entry.  */
+struct sc_hash_entry *
+sc_ht_lookup (tid_t key)
+{
+  if (key < 0) {
+    return NULL;
+  }
+
+  struct sc_hash_entry *it = sc_htable.buckets[key % SC_HASH_BUCKETS];
+
+  while (it != NULL) {
+    if (it->key == key) {
+      return it;
+    }
+    it = it->next;
+  }
+  return NULL;
+}
+
+/** Put a value in the htable, 
+   if key exists, overwrite existing value */
+void 
+sc_ht_put (tid_t key, int val)
+{
+  if (key < 0) {
+    return;
+  }
+
+  struct sc_hash_entry *it = sc_ht_lookup (key);
+  if (it != NULL) {
+    /* Overwrite */
+    it->val = val;
+  } else {
+    struct sc_hash_entry *head = sc_htable.buckets[key % SC_HASH_BUCKETS];
+    it = malloc (sizeof (struct sc_hash_entry));
+    it->next = head;
+    it->key = key;
+    it->val = val;
+    sc_htable.buckets[key % SC_HASH_BUCKETS] = it;
+  }
+}
+
+/** Remove a key in the hash table. */
+void 
+sc_ht_rm (tid_t key)
+{
+  if (key < 0) {
+    return;
+  }
+
+  struct sc_hash_entry *prev = NULL;
+  struct sc_hash_entry *cur = sc_htable.buckets[key % SC_HASH_BUCKETS];
+
+  while (cur != NULL) {
+    if (cur->key == key) {
+      /* remove from the linked list, and free the memory */
+      if (prev != NULL) {
+        prev->next = cur->next;
+      } else {
+        /* cur is the head in the list */
+        sc_htable.buckets[key % SC_HASH_BUCKETS] = cur->next;
+      }
+      free (cur);
+      break;
+    } 
+
+    /* Start next iteration */
+    prev = cur;
+    cur = cur->next;
+  }
+}
+
 /** List of all processes that is waiting for others to finish */
 struct list waiting_process;
 
@@ -24,7 +97,7 @@ struct list waiting_process;
 struct list exec_process;
 
 /** Record return values of some thread(partially fix to process) */
-int retvals[NPROC] UNUSED;
+// int retvals[NPROC] UNUSED;
 
 /** Copy at most bytes from user space, return actual bytes copied.
  * @param pagetable pagetable to lookup.
@@ -210,8 +283,8 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
   list_init (&waiting_process);
   list_init (&exec_process);
-  for (int i = 0; i < NPROC; ++i) {
-    retvals[i] = -1;
+  for (int i = 0; i < SC_HASH_BUCKETS; ++i) {
+    sc_htable.buckets[i] = NULL;
   }
 }
 
