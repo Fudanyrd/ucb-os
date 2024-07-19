@@ -10,6 +10,9 @@
 /** Partition that contains the file system. */
 struct block *fs_device;
 
+/** File system lock */
+static struct lock fs_lock;
+
 static void do_format (void);
 
 /** Initializes the file system module.
@@ -23,6 +26,10 @@ filesys_init (bool format)
 
   inode_init ();
   free_map_init ();
+
+  /* Initialize lock */
+  lock_init (&fs_lock);
+  filesys_lock = &fs_lock;
 
   if (format) 
     do_format ();
@@ -45,6 +52,7 @@ filesys_done (void)
 bool
 filesys_create (const char *name, off_t initial_size) 
 {
+  lock_acquire (filesys_lock);
   block_sector_t inode_sector = 0;
   struct dir *dir = dir_open_root ();
   bool success = (dir != NULL
@@ -55,6 +63,7 @@ filesys_create (const char *name, off_t initial_size)
     free_map_release (inode_sector, 1);
   dir_close (dir);
 
+  lock_release (filesys_lock);
   return success;
 }
 
@@ -66,6 +75,7 @@ filesys_create (const char *name, off_t initial_size)
 struct file *
 filesys_open (const char *name)
 {
+  lock_acquire (filesys_lock);
   struct dir *dir = dir_open_root ();
   struct inode *inode = NULL;
 
@@ -73,7 +83,9 @@ filesys_open (const char *name)
     dir_lookup (dir, name, &inode);
   dir_close (dir);
 
-  return file_open (inode);
+  struct file *ret = file_open (inode);
+  lock_release (filesys_lock);  
+  return ret;
 }
 
 /** Deletes the file named NAME.
@@ -83,10 +95,12 @@ filesys_open (const char *name)
 bool
 filesys_remove (const char *name) 
 {
+  lock_acquire (filesys_lock);
   struct dir *dir = dir_open_root ();
   bool success = dir != NULL && dir_remove (dir, name);
   dir_close (dir); 
 
+  lock_release (filesys_lock);
   return success;
 }
 

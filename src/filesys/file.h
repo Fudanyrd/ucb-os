@@ -3,8 +3,10 @@
 
 #include <stdbool.h>
 #include "filesys/off_t.h"
+#include "threads/synch.h"
 
 struct inode;
+extern struct lock *filesys_lock;
 
 /** Opening and closing files. */
 struct file *file_open (struct inode *);
