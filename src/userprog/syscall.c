@@ -20,6 +20,12 @@ static void syscall_handler (struct intr_frame *);
 /** List of all processes that is waiting for others to finish */
 struct list waiting_process;
 
+/** List of all processes that is waiting for return value from exec. */
+struct list exec_process;
+
+/** Record return values of some thread(partially fix to process) */
+int retvals[NPROC] UNUSED;
+
 /** Copy at most bytes from user space, return actual bytes copied.
  * @param pagetable pagetable to lookup.
  * @param uaddr start of user address to copy from.
@@ -100,7 +106,10 @@ cpstr_from_user (uint32_t *pagetable, char *uaddr, char *kbuf,
                  unsigned int bufsz)
 {
   /* validate parameters */
-  ASSERT (pagetable != NULL && is_user_vaddr(uaddr) && kbuf != NULL);
+  ASSERT (pagetable != NULL && kbuf != NULL);
+  if (!is_user_vaddr(uaddr)) {
+    return 2;
+  }
 
   /* Once loopup a page, and copy only relevant part. */
   char *ptr = pg_round_down (uaddr);  /**< page-aligned address */
@@ -200,6 +209,10 @@ syscall_init (void)
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
   list_init (&waiting_process);
+  list_init (&exec_process);
+  for (int i = 0; i < NPROC; ++i) {
+    retvals[i] = -1;
+  }
 }
 
 /** From interrupt frame, get the system call id. */ 

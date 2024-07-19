@@ -46,6 +46,17 @@ process_execute (const char *file_name)
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
+  
+  /* Suspend execution of current running thread. */
+  enum intr_level old_level = intr_disable ();
+  struct thread *cur = thread_current ();
+  list_push_back (&exec_process, &cur->elem);
+  cur->ticks = tid;
+  thread_block ();
+
+  /* Reenable interrupts */
+  tid = cur->ticks;
+  intr_set_level (old_level);
   return tid;
 }
 
@@ -67,6 +78,9 @@ start_process (void *file_name_)
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
+  /* Wakeup, and tell the parent it started or not. */
+  struct thread *cur = thread_current ();
+  process_unblock (&exec_process, cur->tid, success ? cur->tid : TID_ERROR);
   if (!success) 
     thread_exit ();
 
@@ -104,7 +118,11 @@ process_wait (tid_t child_tid UNUSED)
   struct thread *th = thread_lookup (child_tid);
   if (th == NULL || th->status == THREAD_DYING || th->tid == cur->tid) {
     intr_set_level (old_level);
-    return -1;
+    if (child_tid >= NPROC)
+      return -1;
+    int code = retvals[child_tid];
+    retvals[child_tid] = -1;
+    return code;
   }
 
   /* Use the ticks member to record the process cur is waiting */
@@ -122,13 +140,13 @@ process_wait (tid_t child_tid UNUSED)
 /** Unblock the thread that is waiting for tid to 
   complete. */
 void 
-process_unblock (tid_t tid, int code)
+process_unblock (struct list *lst, tid_t tid, int code)
 {
   struct thread *th;
   struct list_elem *e;
   struct list_elem *next;
-  if (!list_empty (&waiting_process)) {
-    for (e = list_begin (&waiting_process); e != list_end (&waiting_process);
+  if (!list_empty (lst)) {
+    for (e = list_begin (lst); e != list_end (lst);
          e = next) {
       next = list_next (e);
       th = list_entry (e, struct thread, elem);
@@ -161,6 +179,7 @@ process_exit (void)
   printf ("%s: exit(%d)\n", m->argv, code);
   else 
   printf ("%s: exit(%d)\n", cur->name, code);
+  retvals[cur->tid] = code;
 
   /* Close all files associated with the program */
 #ifdef TEST
@@ -200,6 +219,7 @@ process_exit (void)
       next = list_next (e);
       th = list_entry (e, struct thread, elem);
       if ((int)th->ticks == cur->tid) {
+        th->ticks = cur->ticks;
         /* remove from the list; unblock */
         list_remove (e);
         thread_unblock (th);

@@ -5,6 +5,8 @@
 #include "threads/thread.h"
 
 extern struct list waiting_process;
+extern struct list exec_process;
+extern int retvals[NPROC];
 
 struct file;
 /** Metadata of a user process(put on stack) */
@@ -21,7 +23,7 @@ int process_wait (tid_t);
 void process_exit (void);
 void process_terminate (int);
 void process_activate (void);
-void process_unblock (tid_t, int);
+void process_unblock (struct list*, tid_t, int);
 
 int fdalloc (void);
 int fdfree (int);

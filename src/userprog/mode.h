@@ -16,6 +16,9 @@
 /**< Maximum length of file name */
 #define MAX_FN_LEN 14
 
+/**< Maximum number of processes */
+#define NPROC 1024
+
 #undef TEST
 
 #endif /**< userprog/mode.h */
