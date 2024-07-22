@@ -357,9 +357,13 @@ halt_executor (void *args UNUSED)
 static int 
 exit_executor (void *args) 
 {
+  /* Syscall start */
+  struct intr_frame *f = args;
+  void *argv = syscall_args (f);
+
   struct thread *cur = thread_current ();
   int code = -1;  /**< exit code */
-  unsigned ret = copy_from_user (cur->pagedir, args, &code, sizeof(int));
+  unsigned ret = copy_from_user (cur->pagedir, argv, &code, sizeof(int));
   if (ret != sizeof(int)) {
     process_terminate (-1);
   }
@@ -424,7 +428,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   if (id >= 0 && id < syscall_executor_cnt) 
     {
       syscall_executor_t executor = syscall_executors[id];
-      int ret = executor (syscall_args (f));
+      int ret = executor (f);
       /* set the return value of intr_frame. */
       f->eax = ret;
       return;
@@ -447,6 +451,10 @@ syscall_handler (struct intr_frame *f UNUSED)
 static int 
 exec_executor (void *args)
 {
+  /* Syscall start */
+  struct intr_frame *f = args;
+  void *argv = syscall_args (f);
+
   /** note: prototype is
      pid_t exec (const char *file); */
   char *uaddr;
@@ -455,7 +463,7 @@ exec_executor (void *args)
   
   /* parse arguments */
   char buf[256];
-  bytes = copy_from_user (cur->pagedir, args, &uaddr, sizeof (uaddr));
+  bytes = copy_from_user (cur->pagedir, argv, &uaddr, sizeof (uaddr));
   if (bytes != sizeof (uaddr)) {
     /* Fatal: not able to fetch args. */
     process_terminate (-1);
@@ -502,6 +510,10 @@ exec_executor (void *args)
 static int 
 wait_executor (void *args)
 {
+  /* Syscall start */
+  struct intr_frame *f = args;
+  void *argv = syscall_args (f);
+
   /** note: prototype is
      int wait (pid_t);  */
   int tid;
@@ -509,7 +521,7 @@ wait_executor (void *args)
   struct thread *cur = thread_current ();
 
   /* parse arguments */
-  bytes = copy_from_user (cur->pagedir, args, &tid, sizeof (tid));
+  bytes = copy_from_user (cur->pagedir, argv, &tid, sizeof (tid));
   if (bytes != sizeof (tid) || tid == TID_ERROR) {
     return -1;
   }
@@ -521,6 +533,10 @@ wait_executor (void *args)
 static int 
 create_executor (void *args)
 {
+  /* Syscall start */
+  struct intr_frame *f = args;
+  void *argv = syscall_args (f);
+
   /** Note: syscall prototype:
     bool create (const char *file, unsigned initial_size);
    */
@@ -531,7 +547,7 @@ create_executor (void *args)
   char *uaddr;
   unsigned int init_sz;
   unsigned int bytes;
-  bytes = copy_from_user (cur->pagedir, args, &uaddr, sizeof (uaddr));
+  bytes = copy_from_user (cur->pagedir, argv, &uaddr, sizeof (uaddr));
   if (bytes != sizeof (uaddr)) {
     return 0;
   }
@@ -544,7 +560,7 @@ create_executor (void *args)
       process_terminate (-1);
     }
   }
-  bytes = copy_from_user (cur->pagedir, args + 4, &init_sz, sizeof (init_sz));
+  bytes = copy_from_user (cur->pagedir, argv + 4, &init_sz, sizeof (init_sz));
   if (bytes != sizeof (init_sz)) {
     return 0;
   }
@@ -556,6 +572,10 @@ create_executor (void *args)
 static int 
 remove_executor (void *args)
 {
+  /* Syscall start */
+  struct intr_frame *f = args;
+  void *argv = syscall_args (f);
+
   /** Note of syscall prototypes:
     bool remove (const char *file); */
   char kbuf[16];
@@ -564,7 +584,7 @@ remove_executor (void *args)
   /* parse args */
   char *uaddr;
   unsigned int bytes;
-  bytes = copy_from_user (cur->pagedir, args, &uaddr, sizeof (uaddr));
+  bytes = copy_from_user (cur->pagedir, argv, &uaddr, sizeof (uaddr));
   if (bytes != sizeof (uaddr)) {
     return 0;
   }
@@ -590,6 +610,10 @@ remove_executor (void *args)
 static int 
 open_executor (void *args) 
 {
+  /* Syscall start */
+  struct intr_frame *f = args;
+  void *argv = syscall_args (f);
+
   char kbuf[16];  /**< file name is at most 14 bytes */
   struct thread *cur = thread_current ();
   int ret;
@@ -597,7 +621,7 @@ open_executor (void *args)
   /* parse arguments */
   unsigned int len;
   unsigned int uaddr;  /**< user string addr */
-  len = copy_from_user (cur->pagedir, args, &uaddr, sizeof (uaddr));
+  len = copy_from_user (cur->pagedir, argv, &uaddr, sizeof (uaddr));
   if (len != sizeof (uaddr)) {
     return -1;
   }
@@ -644,6 +668,10 @@ open_executor (void *args)
 static int 
 filesize_executor (void *args)
 {
+  /* Syscall start */
+  struct intr_frame *f = args;
+  void *argv = syscall_args (f);
+
   /** note: prototype is
      int filesize (int fd); */
   struct thread *cur = thread_current ();
@@ -651,7 +679,7 @@ filesize_executor (void *args)
   int fd;
 
   /* Parse args */
-  bytes = copy_from_user (cur->pagedir, args, &fd, sizeof (fd));
+  bytes = copy_from_user (cur->pagedir, argv, &fd, sizeof (fd));
   if (bytes != sizeof (fd)) {
     return -1;
   }
@@ -663,6 +691,10 @@ filesize_executor (void *args)
 static int 
 read_executor (void *args)
 {
+  /* Syscall start */
+  struct intr_frame *f = args;
+  void *argv = syscall_args (f);
+
   /** note: prototype of write is 
      int read (int fd, void *buffer, unsigned length); */
   struct thread *cur = thread_current ();
@@ -674,15 +706,15 @@ read_executor (void *args)
   int fd;            /**< file descriptor */
 
   /* parse params(for now, assume fd == 1) */
-  bytes = copy_from_user (cur->pagedir, args, &fd, sizeof (fd));
+  bytes = copy_from_user (cur->pagedir, argv, &fd, sizeof (fd));
   if (bytes != sizeof (fd) || fd < 0) {
     return -1;
   }
-  bytes = copy_from_user (cur->pagedir, args + 4, &ubuf, sizeof (ubuf));
+  bytes = copy_from_user (cur->pagedir, argv + 4, &ubuf, sizeof (ubuf));
   if (bytes != sizeof (ubuf)) {
     return -1;
   }
-  bytes = copy_from_user (cur->pagedir, args + 8, &len, sizeof (len));
+  bytes = copy_from_user (cur->pagedir, argv + 8, &len, sizeof (len));
   if (bytes != sizeof (len)) {
     return -1;
   }
@@ -740,6 +772,10 @@ read_executor (void *args)
 static int 
 write_executor (void *args)
 {
+  /* Syscall start */
+  struct intr_frame *f = args;
+  void *argv = syscall_args (f);
+
   /** note: prototype of write is 
      int write (int fd, void *buffer, unsigned length); */
   struct thread *cur = thread_current ();
@@ -751,15 +787,15 @@ write_executor (void *args)
   int fd;
 
   /* parse params(for now, assume fd == 1) */
-  bytes = copy_from_user (cur->pagedir, args, &fd, sizeof (fd));
+  bytes = copy_from_user (cur->pagedir, argv, &fd, sizeof (fd));
   if (bytes != sizeof (fd) || fd < 0) {
     return -1;
   }
-  bytes = copy_from_user (cur->pagedir, args + 4, &ubuf, sizeof (ubuf));
+  bytes = copy_from_user (cur->pagedir, argv + 4, &ubuf, sizeof (ubuf));
   if (bytes != sizeof (ubuf)) {
     return -1;
   }
-  bytes = copy_from_user (cur->pagedir, args + 8, &len, sizeof (len));
+  bytes = copy_from_user (cur->pagedir, argv + 8, &len, sizeof (len));
   if (bytes != sizeof (len)) {
     return -1;
   }
@@ -813,6 +849,10 @@ write_executor (void *args)
 static int
 tell_executor (void *args)
 {
+  /* Syscall start */
+  struct intr_frame *f = args;
+  void *argv = syscall_args (f);
+
   /** Signature:
      unsigned tell (int fd); */
   int fd;
@@ -820,7 +860,7 @@ tell_executor (void *args)
   struct thread *cur = thread_current ();
 
   /** parse args */
-  bytes = copy_from_user (cur->pagedir, args, &fd, sizeof (fd));
+  bytes = copy_from_user (cur->pagedir, argv, &fd, sizeof (fd));
   if (bytes != sizeof (fd) || fd < 2) {
     /** do not support Console IO */
     return -1;
@@ -833,6 +873,10 @@ tell_executor (void *args)
 static int 
 seek_executor (void *args)
 {
+  /* Syscall start */
+  struct intr_frame *f = args;
+  void *argv = syscall_args (f);
+
   /** Signature:
      void seek (int fd, unsigned position); */
   int fd;
@@ -841,12 +885,12 @@ seek_executor (void *args)
   struct thread *cur = thread_current ();
 
   /** parse args */
-  bytes = copy_from_user (cur->pagedir, args, &fd, sizeof (fd));
+  bytes = copy_from_user (cur->pagedir, argv, &fd, sizeof (fd));
   if (bytes != sizeof (fd) || fd < 2) {
     /** do not support Console IO */
     return -1;
   }
-  bytes = copy_from_user (cur->pagedir, args + 4, &pos, sizeof (pos));  
+  bytes = copy_from_user (cur->pagedir, argv + 4, &pos, sizeof (pos));  
   if (bytes != sizeof (pos)) {
     return -1;
   }
@@ -858,12 +902,16 @@ seek_executor (void *args)
 static int 
 close_executor (void *args)
 {
+  /* Syscall start */
+  struct intr_frame *f = args;
+  void *argv = syscall_args (f);
+
   int fd;
   unsigned bytes;
   struct thread *cur = thread_current ();
 
   /* parse arguments */
-  bytes = copy_from_user (cur->pagedir, args, &fd, sizeof (fd));
+  bytes = copy_from_user (cur->pagedir, argv, &fd, sizeof (fd));
   if (bytes != sizeof (fd)) {
     return -1;
   }
