@@ -1,8 +1,9 @@
 rm filesys.dsk
-pintos-mkdisk filesys.dsk --filesys-size=4
+pintos-mkdisk filesys.dsk --filesys-size=8
 pintos -- -f -q
 
 # binary file
+pintos -p ../../examples/big-stack -a big-stack -- -q
 pintos -p ../../examples/cat -a cat -- -q   # read the content of a file
 pintos -p ../../examples/crrm -a crrm -- -q
 pintos -p ../../examples/fio -a fio -- -q

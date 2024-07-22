@@ -12,6 +12,7 @@
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/malloc.h"
+#include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 
@@ -98,6 +99,34 @@ struct list exec_process;
 
 /** Record return values of some thread(partially fix to process) */
 // int retvals[NPROC] UNUSED;
+
+/** Install pages on stack. */
+static void
+sc_install_stack (uint32_t *pagetable, void *esp, void *start, void *end)
+{
+  /* Validate arguments */
+  ASSERT (start < end);
+  if (esp < 0x8048000 || end > PHYS_BASE || start < esp) {
+    /* Fail */
+    return;
+  }
+
+  void *page = pg_round_down (start);
+  for (; page < pg_round_up (end); page += PGSIZE) 
+    {
+      void *kaddr = pagedir_get_page (pagetable, page);
+      if (kaddr != NULL) {
+        continue;
+      }
+
+      /* Try allocate and install */
+      kaddr = palloc_get_page (PAL_USER);
+      if (kaddr == NULL) {
+        return;
+      }
+      pagedir_set_page (pagetable, page, kaddr, true);
+    }
+}
 
 /** Copy at most bytes from user space, return actual bytes copied.
  * @param pagetable pagetable to lookup.
@@ -363,6 +392,7 @@ exit_executor (void *args)
 
   struct thread *cur = thread_current ();
   int code = -1;  /**< exit code */
+  sc_install_stack (cur->pagedir, f->esp, argv, argv + sizeof (int));
   unsigned ret = copy_from_user (cur->pagedir, argv, &code, sizeof(int));
   if (ret != sizeof(int)) {
     process_terminate (-1);
@@ -463,12 +493,14 @@ exec_executor (void *args)
   
   /* parse arguments */
   char buf[256];
+  sc_install_stack (cur->pagedir, f->esp, argv, argv + sizeof (uaddr));
   bytes = copy_from_user (cur->pagedir, argv, &uaddr, sizeof (uaddr));
   if (bytes != sizeof (uaddr)) {
     /* Fatal: not able to fetch args. */
     process_terminate (-1);
   }
   /** CAUTION: buffer overflow(may pass tests) */
+  sc_install_stack (cur->pagedir, f->esp, uaddr, uaddr + sizeof (buf));
   int ret = cpstr_from_user (cur->pagedir, uaddr, buf, sizeof (buf));
 
   /* Error handling */
@@ -521,6 +553,7 @@ wait_executor (void *args)
   struct thread *cur = thread_current ();
 
   /* parse arguments */
+  sc_install_stack (cur->pagedir, f->esp, argv, argv + sizeof (tid));
   bytes = copy_from_user (cur->pagedir, argv, &tid, sizeof (tid));
   if (bytes != sizeof (tid) || tid == TID_ERROR) {
     return -1;
@@ -547,10 +580,12 @@ create_executor (void *args)
   char *uaddr;
   unsigned int init_sz;
   unsigned int bytes;
+  sc_install_stack (cur->pagedir, f->esp, argv, argv + 8);
   bytes = copy_from_user (cur->pagedir, argv, &uaddr, sizeof (uaddr));
   if (bytes != sizeof (uaddr)) {
     return 0;
   }
+  sc_install_stack (cur->pagedir, f->esp, uaddr, uaddr + sizeof (kbuf));
   bytes = cpstr_from_user (cur->pagedir, uaddr, kbuf, sizeof (kbuf));
   switch (bytes) {
     case 1: {
@@ -584,10 +619,12 @@ remove_executor (void *args)
   /* parse args */
   char *uaddr;
   unsigned int bytes;
+  sc_install_stack (cur->pagedir, f->esp, argv, argv + 4);
   bytes = copy_from_user (cur->pagedir, argv, &uaddr, sizeof (uaddr));
   if (bytes != sizeof (uaddr)) {
     return 0;
   }
+  sc_install_stack (cur->pagedir, f->esp, uaddr, uaddr + 4);
   int ret =cpstr_from_user (cur->pagedir, uaddr, kbuf, sizeof (kbuf));
 
   /* Error handling */
@@ -621,10 +658,12 @@ open_executor (void *args)
   /* parse arguments */
   unsigned int len;
   unsigned int uaddr;  /**< user string addr */
+  sc_install_stack (cur->pagedir, f->esp, argv, argv + 4);
   len = copy_from_user (cur->pagedir, argv, &uaddr, sizeof (uaddr));
   if (len != sizeof (uaddr)) {
     return -1;
   }
+  sc_install_stack (cur->pagedir, f->esp, uaddr, uaddr + sizeof (kbuf));
   ret = cpstr_from_user (cur->pagedir, (void *)uaddr, kbuf, sizeof (kbuf));
 
   /* Error handling */
@@ -679,6 +718,7 @@ filesize_executor (void *args)
   int fd;
 
   /* Parse args */
+  sc_install_stack (cur->pagedir, f->esp, argv, argv + 4);
   bytes = copy_from_user (cur->pagedir, argv, &fd, sizeof (fd));
   if (bytes != sizeof (fd)) {
     return -1;
@@ -706,6 +746,7 @@ read_executor (void *args)
   int fd;            /**< file descriptor */
 
   /* parse params(for now, assume fd == 1) */
+  sc_install_stack (cur->pagedir, f->esp, argv, argv + 12);
   bytes = copy_from_user (cur->pagedir, argv, &fd, sizeof (fd));
   if (bytes != sizeof (fd) || fd < 0) {
     return -1;
@@ -759,6 +800,7 @@ read_executor (void *args)
     }
     ret = fret;
   }
+  sc_install_stack (cur->pagedir, f->esp, ubuf, ubuf + ret);
   ret = copy_to_user (cur->pagedir, kbuf, ubuf, ret);
   free (kbuf);
   if (ret & 0x80000000) {
@@ -787,6 +829,7 @@ write_executor (void *args)
   int fd;
 
   /* parse params(for now, assume fd == 1) */
+  sc_install_stack (cur->pagedir, f->esp, argv, argv + 12);
   bytes = copy_from_user (cur->pagedir, argv, &fd, sizeof (fd));
   if (bytes != sizeof (fd) || fd < 0) {
     return -1;
@@ -810,6 +853,7 @@ write_executor (void *args)
   }
   kbuf[len] = '\0';
 
+  sc_install_stack (cur->pagedir, f->esp, ubuf, ubuf + len);
   unsigned ret = copy_from_user (cur->pagedir, ubuf, kbuf, len);
   if (ret & 0x80000000) {
     /* page fault encountered */
@@ -860,6 +904,7 @@ tell_executor (void *args)
   struct thread *cur = thread_current ();
 
   /** parse args */
+  sc_install_stack (cur->pagedir, f->esp, argv, argv + 4);
   bytes = copy_from_user (cur->pagedir, argv, &fd, sizeof (fd));
   if (bytes != sizeof (fd) || fd < 2) {
     /** do not support Console IO */
@@ -885,6 +930,7 @@ seek_executor (void *args)
   struct thread *cur = thread_current ();
 
   /** parse args */
+  sc_install_stack (cur->pagedir, f->esp, argv, argv + 8);
   bytes = copy_from_user (cur->pagedir, argv, &fd, sizeof (fd));
   if (bytes != sizeof (fd) || fd < 2) {
     /** do not support Console IO */
@@ -911,6 +957,7 @@ close_executor (void *args)
   struct thread *cur = thread_current ();
 
   /* parse arguments */
+  sc_install_stack (cur->pagedir, f->esp, argv, argv + 4);
   bytes = copy_from_user (cur->pagedir, argv, &fd, sizeof (fd));
   if (bytes != sizeof (fd)) {
     return -1;

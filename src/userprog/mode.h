@@ -1,6 +1,8 @@
 #ifndef MODE_H
 #define MODE_H
 
+#include "threads/vaddr.h"
+
 /**< Set the program in test mode. */
 #define TEST
 
@@ -21,6 +23,9 @@
 
 /**< Number of syscall hash buckets */
 #define SC_HASH_BUCKETS 13
+
+/**< Limit stack size to 8 Mb */
+#define STACK_LOW (PHYS_BASE - 0x800000)
 
 #undef TEST
 

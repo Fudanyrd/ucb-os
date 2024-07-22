@@ -1,9 +1,13 @@
 #include "userprog/exception.h"
+#include "userprog/mode.h"
+#include "userprog/pagedir.h"
 #include "userprog/process.h"
 #include <inttypes.h>
 #include <stdio.h>
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
+#include "threads/palloc.h"
+#include "threads/vaddr.h"
 #include "threads/thread.h"
 
 /** Number of page faults processed. */
@@ -110,6 +114,13 @@ kill (struct intr_frame *f)
     }
 }
 
+/** returns true if esp is a valid stack pointer. */
+static bool
+validate_stack (void *esp) 
+{
+  return (esp <= PHYS_BASE) && (esp >= STACK_LOW);
+}
+
 /** Page fault handler.  This is a skeleton that must be filled in
    to implement virtual memory.  Some solutions to project 2 may
    also require modifying this code.
@@ -151,6 +162,23 @@ page_fault (struct intr_frame *f)
   user = (f->error_code & PF_U) != 0;
 
   if (user) {
+#ifdef USERPROG
+    /** Check and expand the stack */
+    if (not_present && validate_stack (f->esp) && fault_addr >= f->esp - 32) {
+      /** install page on stack */
+      void *page = palloc_get_page (PAL_USER);
+      if (page == NULL) 
+        goto kill_user;
+      
+      struct thread *cur = thread_current ();
+      pagedir_set_page (cur->pagedir, pg_round_down (f->esp),
+                        page, true);
+
+      /** Successfully installed stack. */
+      return;
+    }
+  kill_user:
+#endif
    /* elegantly terminate the program */
    f->eip = (void (*) (void)) f->eax;
    f->eax = -1;
