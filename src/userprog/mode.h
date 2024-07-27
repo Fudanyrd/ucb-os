@@ -29,4 +29,7 @@
 
 #undef TEST
 
+/**< Number of frames for each process */
+#define NFRAME 16
+
 #endif /**< userprog/mode.h */

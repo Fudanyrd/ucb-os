@@ -179,8 +179,10 @@ process_exit (void)
   /* I admit these code are specific to the test case 
     sc-bad-arg. PLEASE DO NOT OVERWRITE THE ADDRESS 0xbffffffc,
     FOR IT IS USED TO STORE POINTER TO META. */
-  if (m != NULL)
-  printf ("%s: exit(%d)\n", m->argv, code);
+  if (m != NULL) {
+    if (m->argv != NULL)
+    printf ("%s: exit(%d)\n", m->argv, code);
+  }
   else 
   printf ("%s: exit(%d)\n", cur->name, code);
   enum intr_level old_level;
@@ -253,6 +255,20 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+}
+
+/** process_get_page has the same functionality as palloc_get_page.
+ * The fundamental difference, however, is that process_get_page is 
+ * not global.
+ */
+void *
+process_get_page (enum palloc_flags flag)
+{
+  /** From the designer's perspective, this function is handy for
+     implementing lazy memory allocation. However, It is the 
+     page fault handler's page to require frame and set the correct
+     contents. */
+  PANIC ("Not implemented");
 }
 
 /* terminate an user program with exit code */
@@ -368,6 +384,13 @@ load (char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
+  /** A side effect of process_activate is to allocate space for 
+     metadata. If this fails, terminate the thread. */
+  t->meta = malloc (sizeof (struct process_meta));
+  if (t->meta == NULL)
+    goto done;
+  memset (t->meta, 0, sizeof (struct process_meta));
+
   /* Zero out blanks, tabs in file_name */
 #ifdef TEST
   printf ("file name is %s\n", file_name);
@@ -474,7 +497,7 @@ load (char *file_name, void (**eip) (void), void **esp)
 
   /* Set up process meta */
   ASSERT (sizeof (void *) == 4);
-  struct process_meta *mpt = malloc (sizeof (struct process_meta));
+  struct process_meta *mpt = t->meta;
   if (mpt == NULL) {
     /* Oops, fail */
     goto done;
@@ -485,9 +508,6 @@ load (char *file_name, void (**eip) (void), void **esp)
 #ifdef TEST
   printf ("allocate block %x for meta\n", mpt);
 #endif
-
-  /* Store meta pointer at top of stack. */
-  thread_current ()->meta = mpt;
 
   /* Parse params of the program */
   char *argp = (char *)(PHYS_BASE - fn_len - 5);
@@ -531,7 +551,7 @@ load (char *file_name, void (**eip) (void), void **esp)
   *(int *)sp = 0;            /**< return address */
   *esp = sp;                 /**< esp */
 
-  /* Set the member of meta */
+  /* Set the member of meta: argv */
   mpt->argv = argv[0];
   memset (mpt->ofile, 0, sizeof (mpt->ofile));
 
