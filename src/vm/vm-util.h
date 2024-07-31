@@ -6,6 +6,7 @@
 #include "threads/palloc.h"
 #include "threads/malloc.h"
 #include "threads/vaddr.h"
+#include "userprog/mode.h"
 #include "userprog/process.h"
 
 /** +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -39,6 +40,12 @@ struct map_file
   };
 
 
+/**< Frame table. */
+struct frame_table
+  {
+    void      *pages[NFRAME];    /**< number of private frames(pages) */
+    int        free_ptr;         /**< index to the next uninitialized frame */
+  };
 
 /** +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
  *                      Memory Mapping files

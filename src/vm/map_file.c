@@ -82,7 +82,13 @@ map_file_clear (void *rt)
         free (entry);
       }
     }
+
+    // release the directory pages
+    palloc_free_page (dirptr[i]);
   }
+
+  // release the root page.
+  palloc_free_page (rt);
 }
 
 /**
