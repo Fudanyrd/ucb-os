@@ -233,12 +233,14 @@ process_exit (void)
   struct thread *th;
   struct list_elem *e;
   struct list_elem *next;
+  int has_waiter = 0;
   if (!list_empty (&waiting_process)) {
     for (e = list_begin (&waiting_process); e != list_end (&waiting_process);
          e = next) {
       next = list_next (e);
       th = list_entry (e, struct thread, elem);
       if ((int)th->ticks == cur->tid) {
+        has_waiter = 1;
         th->ticks = cur->ticks;
         /* remove from the list; unblock */
         list_remove (e);
@@ -248,6 +250,9 @@ process_exit (void)
         th->ticks = cur->ticks;
       }
     }
+  }
+  if (has_waiter) {
+    sc_ht_rm (cur->tid);
   }
 
   /* Destroy the current process's page directory and switch back
