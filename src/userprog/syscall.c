@@ -447,6 +447,8 @@ static int write_executor (void *args);
 static int seek_executor (void *args);
 static int tell_executor (void *args);
 static int close_executor (void *args);
+static int mmap_executor (void *args);
+static int munmap_executor (void *args);
 
 /** list of implemented system calls */
 static syscall_executor_t syscall_executors[] = 
@@ -464,6 +466,8 @@ static syscall_executor_t syscall_executors[] =
     [SYS_SEEK] seek_executor,
     [SYS_TELL] tell_executor,
     [SYS_CLOSE] close_executor,
+    [SYS_MMAP]  mmap_executor,
+    [SYS_MUNMAP] munmap_executor,
   };
 
 /** Number of implemented system calls(to detect overflow) */
@@ -986,4 +990,55 @@ close_executor (void *args)
 
   /* close the file descriptor */
   return fdfree (fd);
+}
+
+static int 
+mmap_executor (void *args)
+{
+  /* Syscall start */
+  struct intr_frame *f = args;
+  void *argv = syscall_args (f);
+
+  /* Hint: prototype is mapid_t mmap (int fd, void *addr). */
+  int fd;
+  void *maddr;
+  unsigned bytes;
+  struct thread *cur = thread_current ();
+  sc_install_stack (cur->pagedir, f->esp, argv, argv + 8);
+
+  /* Parse arguments */
+  bytes = copy_from_user (cur->pagedir, argv, &fd, sizeof (fd));
+  if (bytes != sizeof (fd)) {
+    return -1;  // failure
+  }
+  bytes = copy_from_user (cur->pagedir, argv + 4, &maddr, sizeof (maddr));
+  if (bytes != sizeof (maddr)) {
+    return -1;
+  }
+
+  /* execute */
+  return -1;  // NOT IMPLEMENTED
+}
+
+static int 
+munmap_executor (void *args)
+{
+  /* Syscall start */
+  struct intr_frame *f = args;
+  void *argv = syscall_args (f);
+
+  /* Hint: prototype is void munmap (mapid_t mapping) */
+  int fd;
+  unsigned bytes;
+  struct thread *cur = thread_current ();
+  sc_install_stack (cur->pagedir, f->esp, argv, argv + 4);
+
+  /* Parse arguments */
+  bytes = copy_from_user (cur->pagedir, argv, &fd, sizeof (fd));
+  if (bytes != sizeof (fd)) {
+    return -1;
+  }
+
+  /* Execute */
+  return -1;  // NOT IMPLEMENTED
 }
