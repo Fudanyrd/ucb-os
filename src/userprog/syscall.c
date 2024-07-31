@@ -16,6 +16,10 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 
+#ifdef VM
+#include "vm/vm-util.h"
+#endif
+
 static void syscall_handler (struct intr_frame *);
 
 /** Look up a key in the htable, 
@@ -336,6 +340,11 @@ syscall_init (void)
   for (int i = 0; i < SC_HASH_BUCKETS; ++i) {
     sc_htable.buckets[i] = NULL;
   }
+
+#ifdef VM
+  /* Initialize virtual memory system */
+  vm_init ();
+#endif
 }
 
 /** From interrupt frame, get the system call id. */ 
