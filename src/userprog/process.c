@@ -19,9 +19,14 @@
 #include "threads/flags.h"
 #include "threads/init.h"
 #include "threads/interrupt.h"
+#include "threads/malloc.h"
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+
+#ifdef VM
+#include "vm/vm-util.h"
+#endif
 
 static thread_func start_process NO_RETURN;
 static bool load (char *cmdline, void (**eip) (void), void **esp);
@@ -215,6 +220,12 @@ process_exit (void)
 #endif
   if (m != NULL && m->executable != NULL)  /**< close the executable */
   file_close (m->executable);
+
+#ifdef VM
+   /**< Free the members of process_meta */
+   if (m->map_file_rt != NULL)
+     map_file_clear (m->map_file_rt);
+#endif
   if (m != NULL)
   free (*mpp);
 
@@ -390,6 +401,14 @@ load (char *file_name, void (**eip) (void), void **esp)
   if (t->meta == NULL)
     goto done;
   memset (t->meta, 0, sizeof (struct process_meta));
+
+  struct process_meta *meta = t->meta;
+#ifdef VM
+  /** try initialize file mapping table. */
+  meta->map_file_rt = map_file_init ();
+  if (meta->map_file_rt == NULL)
+    goto done;
+#endif
 
   /* Zero out blanks, tabs in file_name */
 #ifdef TEST
@@ -641,6 +660,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
+#ifndef VM
   file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0) 
     {
@@ -676,6 +696,41 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       upage += PGSIZE;
     }
   return true;
+#else  // VM
+  struct process_meta *meta = thread_current ()->meta;
+  void *rt = meta->map_file_rt;
+  while (zero_bytes > 0 || read_bytes > 0)
+    {
+      /* Calculate how to fill this page.
+         We will read PAGE_READ_BYTES bytes from FILE
+         and zero the final PAGE_ZERO_BYTES bytes. */
+      size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+      size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+      /* Lazily map page */
+      struct map_file *mf = malloc (sizeof (struct map_file));
+      if (mf == NULL)  // allocation failure
+        return false;
+
+      mf->fobj = file_reopen (file); 
+      mf->writable = writable;
+      mf->offset = ofs;
+      mf->read_bytes = page_read_bytes;
+      if (!map_file (rt, mf, upage)) {
+        /** Oops, failure to create mapping */
+        return false;
+      }
+
+      /** Advance */
+      ofs += page_read_bytes;
+      read_bytes -= page_read_bytes;
+      zero_bytes -= page_zero_bytes;
+      upage += PGSIZE;
+    }
+
+  /* success */ 
+  return true;
+#endif // end of VM
 }
 
 /** Create a minimal stack by mapping a zeroed page at the top of

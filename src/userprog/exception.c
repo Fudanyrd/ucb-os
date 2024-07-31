@@ -10,6 +10,10 @@
 #include "threads/vaddr.h"
 #include "threads/thread.h"
 
+#ifdef VM
+#include "vm/vm-util.h"
+#endif
+
 /** Number of page faults processed. */
 static long long page_fault_cnt;
 
@@ -177,6 +181,16 @@ page_fault (struct intr_frame *f)
       /** Successfully installed stack. */
       return;
     }
+#ifdef VM
+    struct process_meta *meta = thread_current ()->meta;
+    /* Check the map file table for the page */
+    struct map_file *mf = map_file_lookup (meta->map_file_rt, fault_addr);
+    if (map_file_fill_page (mf, pg_round_down (fault_addr))) {
+      /* Success! can continue execution */
+      return;
+    }
+#endif
+
   kill_user:
 #endif
    /* elegantly terminate the program */
