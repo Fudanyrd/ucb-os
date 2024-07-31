@@ -48,6 +48,6 @@ struct map_file *map_file_lookup (void *, void *);
 bool map_file (void *rt, struct map_file *mf, void *uaddr);
 void *map_file_init (void);
 void map_file_clear (void *);
-bool map_file_fill_page (struct map_file *, void *);
+int map_file_fill_page (struct map_file *, void *);
 
 #endif /**< vm/vm-util.h */

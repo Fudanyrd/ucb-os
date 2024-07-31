@@ -156,8 +156,15 @@ copy_from_user (uint32_t *pagetable, void *uaddr, void *kbuf,
     {
       void *kaddr = pagedir_get_page (pagetable, ptr);
       if (kaddr == NULL) {
+#ifndef VM    /* +-+-+-+-+-+-+-+-+-+- not VM +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-*/
         /* encounter page fault, abort(else will crash!) */
         return (bytes - left) | 0x80000000;
+#else         /* +-+-+-+-+-+-+-+-+-+- is VM +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-*/
+        if (!process_handle_pgfault (ptr))
+          return (bytes - left) | 0x80000000;
+        kaddr = pagedir_get_page (pagetable, ptr);
+        ASSERT (kaddr != NULL);
+#endif        /* +-+-+-+-+-+-+-+-+-+- end VM +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-*/
       }
 
       kaddr += uaddr - ptr;
@@ -221,8 +228,15 @@ cpstr_from_user (uint32_t *pagetable, char *uaddr, char *kbuf,
     {
       void *kaddr = pagedir_get_page (pagetable, ptr);
       if (kaddr == NULL) {
+#ifndef VM    /* +-+-+-+-+-+-+-+-+-+- not VM +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-*/
         /* encounter page fault, abort(else will crash!) */
         return 2;
+#else         /* +-+-+-+-+-+-+-+-+-+- is VM +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-*/
+        if (!process_handle_pgfault (ptr))
+          return 2;
+        kaddr = pagedir_get_page (pagetable, ptr);
+        ASSERT (kaddr != NULL);  // ok, continue execution
+#endif        /* +-+-+-+-+-+-+-+-+-+- end VM +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-*/
       }
 
       kaddr += uaddr - ptr;
@@ -280,8 +294,15 @@ copy_to_user (uint32_t *pagetable, void *kbuf, void *uaddr,
     {
       void *kaddr = pagedir_get_page (pagetable, ptr);
       if (kaddr == NULL) {
+#ifndef VM    /* +-+-+-+-+-+-+-+-+-+- not VM +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-*/
         /* encounter page fault, abort(else will crash!) */
         return 0x80000000 | (bytes - left);
+#else         /* +-+-+-+-+-+-+-+-+-+- is VM +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-*/
+        if (!process_handle_pgfault (ptr))
+          return 0x80000000 | (bytes - left);
+        kaddr = pagedir_get_page (pagetable, ptr);
+        ASSERT (kaddr != NULL);  // ok, continue execution
+#endif        /* +-+-+-+-+-+-+-+-+-+- end VM +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-*/
       }
 
       kaddr += uaddr - ptr;

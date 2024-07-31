@@ -154,7 +154,7 @@ map_file (void *rt, struct map_file *mf, void *uaddr)
   return true;
 }
 
-bool
+int
 map_file_fill_page (struct map_file *mf, void *upage)
 {
   /* Validate parameter */
@@ -174,6 +174,7 @@ map_file_fill_page (struct map_file *mf, void *upage)
     {
       int bytes = file_read_at (mf->fobj, kpage, mf->read_bytes, mf->offset);
       if (bytes != mf->read_bytes) {
+        free (kpage);
         return false;
       }
     }
@@ -185,6 +186,10 @@ map_file_fill_page (struct map_file *mf, void *upage)
   }
 
   /* Create the file mapping */
-  return pagedir_set_page (thread_current ()->pagedir, 
-                           upage, kpage, mf->writable);
+  int ret = pagedir_set_page (thread_current ()->pagedir, 
+                               upage, kpage, mf->writable);
+  if (!ret) {
+    free (kpage);
+  }
+  return ret;
 }

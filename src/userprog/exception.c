@@ -125,6 +125,18 @@ validate_stack (void *esp)
   return (esp <= PHYS_BASE) && (esp >= STACK_LOW);
 }
 
+#ifdef VM
+#include "vm/vm-util.h"
+/** Handle page fault happened at uaddr. Returns true if successful */
+int
+process_handle_pgfault (void *uaddr)
+{
+  struct process_meta *meta = thread_current ()->meta;
+  struct map_file *mf = map_file_lookup (meta->map_file_rt, uaddr);
+  return map_file_fill_page (mf, pg_round_down (uaddr));
+}
+#endif
+
 /** Page fault handler.  This is a skeleton that must be filled in
    to implement virtual memory.  Some solutions to project 2 may
    also require modifying this code.
