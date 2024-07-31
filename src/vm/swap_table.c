@@ -17,9 +17,12 @@ static inline void
 swaptb_read_page (unsigned int blockno, void *page)
 {
   struct block *blk = block_get_role (BLOCK_SWAP);
-  for (int i = 0; i < 8; ++i)
+  for (int i = 0; i < SECTORS_PER_PAGE; ++i)
     {
       block_read (blk, blockno + i, page);
+
+      /* Advance */
+      page += BLOCK_SECTOR_SIZE;
     }
 }
 
@@ -28,9 +31,12 @@ swaptb_write_page (unsigned int blockno, const void *page)
 {
   struct block *blk = block_get_role (BLOCK_SWAP);
   /* Remember, a memory page equals 8 disk blocks */
-  for (int i = 0; i < 8; ++i)
+  for (int i = 0; i < SECTORS_PER_PAGE; ++i)
     {
       block_write (blk, blockno + i, page);
+
+      /* Advance */
+      page += BLOCK_SECTOR_SIZE;
     }
 }
 
@@ -82,6 +88,9 @@ swap_talbe_free_page (unsigned int page_idx)
 void 
 vm_init (void)
 {
+  /* Validate macro SECTORS_PER_PAGE */
+  ASSERT (PGSIZE == (SECTORS_PER_PAGE * BLOCK_SECTOR_SIZE));
+
   /* Create a bitmap that supports a swap disk 
     of 16 MB(= 4 * 1024 memory pages), this bitmap is 0.5 KB */
   swap_table_bitmap = bitmap_create (SWAP_PAGES);

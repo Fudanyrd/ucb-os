@@ -19,6 +19,9 @@
 /**< Number of memory pages to be stored in swap dev */
 #define SWAP_PAGES 4096
 
+/** A memory page equals to 8 disk sectors */
+#define SECTORS_PER_PAGE 8
+
 void vm_init (void);
 
 /** +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
