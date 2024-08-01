@@ -102,6 +102,13 @@ ste_get_blockno (unsigned int ste)
   return ste & (~0x00000007);
 }
 
+/** +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+ *                          Frame Tables
+  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- */
+
+void frametb_init (struct frame_table *ftb);
+void *frametb_get_page (struct frame_table *ftb, int zero);
+void frametb_free (struct frame_table *ftb);
 
 /**< These methods controls allocating/freeing 8 consecutive sectors. */
 
