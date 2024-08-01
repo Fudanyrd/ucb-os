@@ -6,40 +6,22 @@
 #include "threads/palloc.h"
 #include "vm-util.h"
 
+/**
+ * Current status of development:
+ * 
+ * Compilation    [PASSED]
+ * Functionality  [UNKNOWN]
+ * Make-check     [PASSED]
+ * 
+ * Date Aug 1, 2024
+ */
+
 /** +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
  *                          Helper functions
   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- */
 
 /** For swap table to keep track of used disk spaces. */
 static struct bitmap *swap_table_bitmap;
-
-/** Read an entire memory page from swap block */
-static inline void
-swaptb_read_page (unsigned int blockno, void *page)
-{
-  struct block *blk = block_get_role (BLOCK_SWAP);
-  for (int i = 0; i < SECTORS_PER_PAGE; ++i)
-    {
-      block_read (blk, blockno + i, page);
-
-      /* Advance */
-      page += BLOCK_SECTOR_SIZE;
-    }
-}
-
-static inline void
-swaptb_write_page (unsigned int blockno, const void *page)
-{
-  struct block *blk = block_get_role (BLOCK_SWAP);
-  /* Remember, a memory page equals 8 disk blocks */
-  for (int i = 0; i < SECTORS_PER_PAGE; ++i)
-    {
-      block_write (blk, blockno + i, page);
-
-      /* Advance */
-      page += BLOCK_SECTOR_SIZE;
-    }
-}
 
 /** Allocate a consecutive 8 disk blocks to store a memory page,
    Pay attention to how to translate from page index to block no:
@@ -75,6 +57,7 @@ swap_table_free_page (unsigned int page_idx)
   // validate parameters
   ASSERT (swap_table_bitmap != NULL);
   ASSERT (page_idx < SWAP_PAGES);
+  /* Avoid double free */
   ASSERT (bitmap_test (swap_table_bitmap, page_idx));
 #endif
   // free the bit in the map
@@ -124,20 +107,110 @@ swaptb_free_dir (struct swap_table_dir *dir)
   palloc_free_page ((void *) dir);
 }
 
+/** Returns the root index  */
+static inline unsigned int
+swaptb_root_idx (void *uaddr)
+{
+#ifndef ROBUST
+  return ((unsigned int) uaddr) >> 22U;
+#else
+  unsigned ret = ((unsigned int) uaddr) >> 22U;
+  ASSERT (ret < 1024U);
+  return ret;
+#endif
+}
+/** Returns the directory index */
+static inline unsigned int
+swaptb_dir_idx (void *uaddr)
+{
+#ifndef ROBUST
+  return (((unsigned int) uaddr) << 10U) >> 22U;
+#else
+  unsigned ret = (((unsigned int) uaddr) << 10U) >> 22U;
+  ASSERT (ret < 1024U);
+  return ret;
+#endif
+}
+
+/** 
+ * Walk down the swap table for an entry.
+ * @param alloc set to 0 if only lookup, set to 1 if allocate entry.
+ */
+static unsigned int *
+swaptb_walk (struct swap_table_root *rt, void *uaddr, int alloc)
+{
+#ifdef ROBUST
+  ASSERT (rt != NULL);
+#endif
+  struct swap_table_dir *dir;
+  unsigned int idx;
+
+  /* Now at root page */
+  idx = swaptb_root_idx (uaddr);
+  dir = rt->dirs[idx];
+
+  /* directory page not found */
+  if (dir == NULL)
+    {
+      if (alloc) {
+        /* Try to install page! */
+        void *page = palloc_get_page (0);
+        if (page == NULL)
+          return NULL;
+        memset (page, 0, PGSIZE);
+        rt->dirs[idx] = page;
+      } else {
+        /* Not found */
+        return NULL;
+      }
+    }
+  dir = rt->dirs[idx];
+  ASSERT (dir != NULL);
+
+  /* Now at directory page */
+  idx = swaptb_dir_idx (uaddr);
+  return &(dir->entries[idx]);
+}
+
 /** +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
  *                          Swap Tables Method
   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- */
+
+unsigned int 
+swaptb_alloc_sec (void)
+{
+#ifdef ROBUST
+  unsigned int sec = swap_table_alloc_page (); 
+  ASSERT (sec < SWAP_PAGES);
+  return sec * 8;
+#else
+  return 8U * swap_table_alloc_page ();
+#endif
+}
+
+void 
+swaptb_free_sec (unsigned int sec)
+{
+#ifdef ROBUST
+  ASSERT ((sec & 0x7) == 0);
+  swap_table_free_page (sec / 8U);
+#else
+  swap_table_free_page (sec / 8U);
+#endif
+}
 
 /** Initialize virtual memory */
 void 
 vm_init (void)
 {
+#ifdef ROBUST
   /* Validate macro SECTORS_PER_PAGE */
   STATIC_ASSERT (PGSIZE == (SECTORS_PER_PAGE * BLOCK_SECTOR_SIZE));
 
   /* Test the size of swap table root and directory */
   STATIC_ASSERT (sizeof (struct swap_table_root) == PGSIZE);
   STATIC_ASSERT (sizeof (struct swap_table_dir) == PGSIZE);
+#endif
 
   /* Create a bitmap that supports a swap disk 
     of 16 MB(= 4 * 1024 memory pages), this bitmap is 0.5 KB */
@@ -186,4 +259,26 @@ swaptb_free (struct swap_table_root *rt)
   
   /* Free the root page. */
   palloc_free_page (rt);
+}
+
+/** Given an user address, look up the swap table entry. */
+unsigned int *
+swaptb_lookup (struct swap_table_root *rt, void *uaddr)
+{
+  return swaptb_walk (rt, uaddr, 0);
+}
+
+/** Returns 1 if maps successfully, 
+   0 if cannot allocate pages or mapping already exists. */
+int 
+swaptb_map (struct swap_table_root *rt, void *uaddr, unsigned int blk)
+{
+  unsigned int *ste = swaptb_walk (rt, uaddr, 1);
+  if (ste == NULL || (*ste & STE_V) != 0)
+    {
+      return 0;
+    }
+  ASSERT ((blk & 0X7) == 0);
+  *ste = STE_V | blk; 
+  return 1;
 }

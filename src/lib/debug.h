@@ -22,10 +22,11 @@ void debug_backtrace_all (void);
 
 
 
-#define STATIC_ASSERT(CONDITION) switch (0) {                   \
+/** Static assertion */
+#define STATIC_ASSERT(CONDITION) switch (0) {                    \
                                     case (0): break;             \
                                     case (CONDITION): break;     \
-                                  }
+                                 }
 
 
 /** This is outside the header guard so that debug.h may be

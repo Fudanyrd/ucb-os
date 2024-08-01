@@ -102,9 +102,57 @@ ste_get_blockno (unsigned int ste)
   return ste & (~0x00000007);
 }
 
+
+/**< These methods controls allocating/freeing 8 consecutive sectors. */
+
+unsigned int swaptb_alloc_sec (void);
+void swaptb_free_sec (unsigned int sec);
+
+/**< These methods operate on swap tables. */
+
 struct swap_table_root *swaptb_create (void);
 void swaptb_free (struct swap_table_root *rt);
 unsigned int *swaptb_lookup (struct swap_table_root *rt, void *uaddr);
 int swaptb_map (struct swap_table_root *rt, void *uaddr, unsigned int blk);
+
+/** +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+ *                        Block Swap Device IO
+  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- */
+#include "devices/block.h"
+
+/**
+ * Read a memory page (8 sectors) from disk.
+ * @param sector start of 8 sectors to read. 
+ */
+static inline void
+swaptb_read_page (unsigned int sector, void *page)
+{
+  struct block *blk = block_get_role (BLOCK_SWAP);
+  for (int i = 0; i < SECTORS_PER_PAGE; ++i)
+    {
+      block_read (blk, sector + i, page);
+
+      /* Advance */
+      page += BLOCK_SECTOR_SIZE;
+    }
+}
+
+/**
+ * Write a memory page (8 sectors) into disk.
+ * @param sector start of 8 sectors to write.
+ */
+static inline void
+swaptb_write_page (unsigned int sector, const void *page)
+{
+  struct block *blk = block_get_role (BLOCK_SWAP);
+  /* Remember, a memory page equals 8 disk blocks */
+  for (int i = 0; i < SECTORS_PER_PAGE; ++i)
+    {
+      block_write (blk, sector + i, page);
+
+      /* Advance */
+      page += BLOCK_SECTOR_SIZE;
+    }
+}
 
 #endif /**< vm/vm-util.h */
