@@ -1,4 +1,5 @@
 #include <string.h>
+#include <debug.h>
 
 #include "lib/kernel/bitmap.h"
 #include "devices/block.h"
@@ -68,7 +69,7 @@ swap_table_alloc_page (void)
    page_idx * 8 => blockno.
  */
 static unsigned int
-swap_talbe_free_page (unsigned int page_idx)
+swap_table_free_page (unsigned int page_idx)
 {
 #ifdef ROBUST
   // validate parameters
@@ -80,6 +81,49 @@ swap_talbe_free_page (unsigned int page_idx)
   bitmap_set (swap_table_bitmap, page_idx, 0);
 }
 
+/**
+ * Allocate an swap table entry. Panic if cannot allocate.
+ */
+static inline unsigned int
+swap_table_alloc_ste (void)
+{
+  unsigned int ret = swap_table_alloc_page ();
+  /* Add the valid bit */
+  return ret | STE_V;
+}
+
+/** Free a swap table entry. This is called by swaptb_free. */
+static inline void
+swap_table_free_ste (unsigned int ste)
+{
+#ifdef ROBUST
+  ASSERT ((ste & STE_V) != 0);
+#endif
+  swap_table_free_page (ste & (~0x00000007));
+}
+
+/* Free a swap table directory page. */
+static void
+swaptb_free_dir (struct swap_table_dir *dir)
+{
+#ifdef ROBUST
+  ASSERT (dir != NULL);
+#endif
+  unsigned int entry;
+  for (int i = 0; i < 1024; ++i)
+    {
+      /* Get entry */
+      entry = dir->entries[i];
+      if ((entry & STE_V) != 0)
+        {
+          swap_table_free_ste (entry);
+        }
+    }
+
+  /* Free the page occupied by dir */ 
+  palloc_free_page ((void *) dir);
+}
+
 /** +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
  *                          Swap Tables Method
   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- */
@@ -89,7 +133,11 @@ void
 vm_init (void)
 {
   /* Validate macro SECTORS_PER_PAGE */
-  ASSERT (PGSIZE == (SECTORS_PER_PAGE * BLOCK_SECTOR_SIZE));
+  STATIC_ASSERT (PGSIZE == (SECTORS_PER_PAGE * BLOCK_SECTOR_SIZE));
+
+  /* Test the size of swap table root and directory */
+  STATIC_ASSERT (sizeof (struct swap_table_root) == PGSIZE);
+  STATIC_ASSERT (sizeof (struct swap_table_dir) == PGSIZE);
 
   /* Create a bitmap that supports a swap disk 
     of 16 MB(= 4 * 1024 memory pages), this bitmap is 0.5 KB */
@@ -113,4 +161,29 @@ swaptb_create (void)
   }
 
   return page;
+}
+
+void 
+swaptb_free (struct swap_table_root *rt)
+{
+#ifdef ROBUST
+  /* Validate parameters */
+  ASSERT (rt != NULL);
+#endif
+  struct swap_table_dir *dir;
+
+  for (int i = 0; i < 1024; ++i)
+    {
+      /* Get directory page */
+      dir = rt->dirs[i];
+      if (dir == NULL) {
+        continue;
+      }
+
+      /* Free the directory. */
+      swaptb_free_dir (dir);
+    }
+  
+  /* Free the root page. */
+  palloc_free_page (rt);
 }
