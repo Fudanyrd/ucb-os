@@ -32,4 +32,6 @@
 /**< Number of frames for each process */
 #define NFRAME 16
 
+#define VM
+
 #endif /**< userprog/mode.h */

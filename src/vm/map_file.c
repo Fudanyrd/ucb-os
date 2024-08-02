@@ -160,6 +160,7 @@ map_file (void *rt, struct map_file *mf, void *uaddr)
   return true;
 }
 
+/** Given the map file obj, fill the content of a user page. */
 int
 map_file_fill_page (struct map_file *mf, void *upage)
 {
@@ -198,4 +199,37 @@ map_file_fill_page (struct map_file *mf, void *upage)
     free (kpage);
   }
   return ret;
+}
+
+/**
+ * Initialize a page using the info in the mf.
+ * @return 1 on success, 0 if failure(device crash, etc.)
+ */
+int 
+map_file_init_page (struct map_file *mf, void *kpage)
+{
+  /* Validate parameter */
+  if (mf == NULL || kpage == NULL) {
+    return false;
+  }
+  mf_validate (mf);
+
+  /* Read bytes from file */
+  if (mf->read_bytes != 0)
+    {
+      int bytes = file_read_at (mf->fobj, kpage, mf->read_bytes, mf->offset);
+      if (bytes != mf->read_bytes) {
+        free (kpage);
+        return false;
+      }
+    }
+
+  /* Fill the rest to zero */
+  int zero_bytes = PGSIZE - mf->read_bytes;
+  if (zero_bytes != 0) {
+    memset (kpage + mf->read_bytes, 0, zero_bytes);
+  }
+
+  /* Success */
+  return true;
 }

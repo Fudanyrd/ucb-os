@@ -182,7 +182,11 @@ page_fault (struct intr_frame *f)
     /** Check and expand the stack */
     if (not_present && validate_stack (f->esp) && fault_addr >= f->esp - 32) {
       /** install page on stack */
+#ifndef VM
       void *page = palloc_get_page (PAL_USER);
+#else
+      void *page = vm_alloc_page (0, pg_round_down (f->esp));
+#endif
       if (page == NULL) 
         goto kill_user;
       
@@ -194,13 +198,8 @@ page_fault (struct intr_frame *f)
       return;
     }
 #ifdef VM
-    struct process_meta *meta = thread_current ()->meta;
-    /* Check the map file table for the page */
-    struct map_file *mf = map_file_lookup (meta->map_file_rt, fault_addr);
-    if (map_file_fill_page (mf, pg_round_down (fault_addr))) {
-      /* Success! can continue execution */
-      return;
-    }
+      if (vm_fetch_page (pg_round_down (fault_addr)))
+        return;
 #endif
 
   kill_user:

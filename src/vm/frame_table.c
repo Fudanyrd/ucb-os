@@ -21,10 +21,11 @@ frametb_init (struct frame_table *ftb)
  * @param zero if set to 1, then zero out the entire allocated page.
  */
 void *
-frametb_get_page (struct frame_table *ftb, int zero)
+frametb_get_page (struct frame_table *ftb, void *uaddr, int zero)
 {
 #ifdef ROBUST
   ASSERT (ftb != NULL);
+  ASSERT (uaddr != NULL);
   ASSERT (ftb->free_ptr >= 0 && ftb->free_ptr <= NFRAME);
 #endif
   if (ftb->free_ptr == NFRAME) {
@@ -35,6 +36,7 @@ frametb_get_page (struct frame_table *ftb, int zero)
   if (page != NULL) {
     /* Record the address of the page */
     ftb->pages[ftb->free_ptr] = page;
+    ftb->upages[ftb->free_ptr] = uaddr;
     ftb->free_ptr++;
   }
 

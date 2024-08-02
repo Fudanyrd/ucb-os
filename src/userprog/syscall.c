@@ -124,7 +124,11 @@ sc_install_stack (uint32_t *pagetable, void *esp, void *start, void *end)
       }
 
       /* Try allocate and install */
+#ifndef VM
       kaddr = palloc_get_page (PAL_USER);
+#else
+      kaddr = vm_alloc_page (0, page);
+#endif
       if (kaddr == NULL) {
         return;
       }

@@ -5,6 +5,7 @@ pintos -- -f -q
 # binary file
 pintos -p ../../examples/big-stack -a big-stack -- -q
 pintos -p ../../examples/cat -a cat -- -q   # read the content of a file
+pintos -p ../../examples/echo -a echo -- -q   # read the content of a file
 pintos -p ../../examples/crrm -a crrm -- -q
 pintos -p ../../examples/fio -a fio -- -q
 pintos -p ../../examples/fio2 -a fio2 -- -q

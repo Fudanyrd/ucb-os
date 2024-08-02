@@ -21,8 +21,17 @@ typedef struct frame_entry
   } frame_entry;
 #endif
 
+/** +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+ *                           Data Structures  
+  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- */
+
 struct file;
 struct map_file;
+/**< Definition in vm/vm-util.h */
+struct map_file;
+struct frame_table;
+struct swap_table_root;
+struct swap_table_dir;
 
 /** Metadata of a user process(put on stack) */
 struct process_meta
@@ -33,6 +42,8 @@ struct process_meta
     struct file    *executable; /**< Executable; must close on process_exit. */
 #ifdef VM  /**< Virtual memory is implemented! */
     void           *map_file_rt;     /**< Root of file mapping table. */
+    struct swap_table_root *swaptb;  /**< Swap table */
+    struct frame_table      frametb; /**< Frame table */
 #endif
   };
 

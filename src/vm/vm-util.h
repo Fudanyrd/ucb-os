@@ -5,9 +5,9 @@
 #include "filesys/file.h"
 #include "threads/palloc.h"
 #include "threads/malloc.h"
+#include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/mode.h"
-#include "userprog/process.h"
 
 /** +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
  *                      Special Settings
@@ -22,7 +22,13 @@
 /** A memory page equals to 8 disk sectors */
 #define SECTORS_PER_PAGE 8
 
+/** +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+ *                       Virtual Memory Utility 
+  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- */
+
 void vm_init (void);
+void *vm_alloc_page (int zero, void *uaddr);
+void *vm_fetch_page (void *upage);
 
 /** +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
  *                         Data Structures 
@@ -55,6 +61,7 @@ struct map_file
 struct frame_table
   {
     void      *pages[NFRAME];    /**< number of private frames(pages) */
+    void      *upages[NFRAME];   /**< record user page mappings */
     int        free_ptr;         /**< index to the next uninitialized frame */
   };
 
@@ -80,11 +87,12 @@ struct swap_table_root
  *                      Memory Mapping files
   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- */
 
-struct map_file *map_file_lookup (void *, void *);
+struct map_file *map_file_lookup (void *rt, void *uaddr);
 bool map_file (void *rt, struct map_file *mf, void *uaddr);
 void *map_file_init (void);
 void map_file_clear (void *);
-int map_file_fill_page (struct map_file *, void *);
+int map_file_fill_page (struct map_file *mf, void *upage);
+int map_file_init_page (struct map_file *mf, void *kpage);
 
 /** +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
  *                          Swap Tables
@@ -107,7 +115,7 @@ ste_get_blockno (unsigned int ste)
   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- */
 
 void frametb_init (struct frame_table *ftb);
-void *frametb_get_page (struct frame_table *ftb, int zero);
+void *frametb_get_page (struct frame_table *ftb, void *uaddr, int zero);
 void frametb_free (struct frame_table *ftb);
 
 /**< These methods controls allocating/freeing 8 consecutive sectors. */

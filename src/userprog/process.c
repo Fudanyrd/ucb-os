@@ -221,10 +221,19 @@ process_exit (void)
   if (m != NULL && m->executable != NULL)  /**< close the executable */
   file_close (m->executable);
 
+  if (m == NULL)
+    goto unblock_op;
 #ifdef VM
-   /**< Free the members of process_meta */
+   /* Free the members of process_meta */
    if (m->map_file_rt != NULL)
      map_file_clear (m->map_file_rt);
+
+  /* Free the swap table. */
+  if (m->swaptb != NULL)
+    swaptb_free (m->swaptb);
+
+  /* Free the frame table. */
+  frametb_free (&m->frametb);
 #endif
   if (m != NULL)
   free (*mpp);
@@ -234,6 +243,7 @@ process_exit (void)
   struct list_elem *e;
   struct list_elem *next;
   int has_waiter = 0;
+unblock_op:
   if (!list_empty (&waiting_process)) {
     for (e = list_begin (&waiting_process); e != list_end (&waiting_process);
          e = next) {
@@ -413,6 +423,14 @@ load (char *file_name, void (**eip) (void), void **esp)
   meta->map_file_rt = map_file_init ();
   if (meta->map_file_rt == NULL)
     goto done;
+  
+  /** try initializing swap table. */
+  meta->swaptb = swaptb_create ();
+  if (meta->swaptb == NULL)
+    goto done;
+
+  /** try initializing the frame table. */
+  frametb_init (&meta->frametb);
 #endif
 
   /* Zero out blanks, tabs in file_name */
@@ -435,6 +453,8 @@ load (char *file_name, void (**eip) (void), void **esp)
 
   /* Open executable file. */
   file = filesys_open (file_name);
+  if (file == NULL)
+    goto done;
 
   file_deny_write (file);
   if (file == NULL) 
@@ -747,13 +767,33 @@ setup_stack (void **esp)
   bool success = false;
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+
+  /* Hack the frame table a little... */
+#ifdef VM
+  struct thread *cur = thread_current ();
+  struct process_meta *meta = cur->meta;
+  struct frame_table *ftb = &meta->frametb;
+  ASSERT (ftb->free_ptr == 0);
+  ftb->free_ptr = 1;
+  ftb->pages[0] = kpage;
+  ftb->upages[0] = ((uint8_t *) PHYS_BASE) - PGSIZE;
+#endif
+
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
         *esp = PHYS_BASE;
-      else
+      else {
         palloc_free_page (kpage);
+
+        /* Note that in vm mode, we previously set the frame table. We
+          have to avoid double free. */
+#ifdef VM
+        ftb->pages[0] = NULL;
+        ftb->upages[0] = NULL;
+#endif
+      }
     }
   return success;
 }

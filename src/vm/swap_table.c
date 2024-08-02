@@ -236,6 +236,7 @@ swaptb_create (void)
   return page;
 }
 
+/** Free the space of a swap table and remove reference in the device. */
 void 
 swaptb_free (struct swap_table_root *rt)
 {
