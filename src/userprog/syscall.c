@@ -838,7 +838,10 @@ read_executor (void *args)
     }
     ret = fret;
   }
-  sc_install_stack (cur->pagedir, f->esp, ubuf, ubuf + ret);
+  if (ret) {
+    /* If ret == 0(unusual condition), then don't have to install stack! */
+    sc_install_stack (cur->pagedir, f->esp, ubuf, ubuf + ret);
+  }
   ret = copy_to_user (cur->pagedir, kbuf, ubuf, ret);
   free (kbuf);
   if (ret & 0x80000000) {
@@ -891,7 +894,9 @@ write_executor (void *args)
   }
   kbuf[len] = '\0';
 
-  sc_install_stack (cur->pagedir, f->esp, ubuf, ubuf + len);
+  if (len != 0) {
+    sc_install_stack (cur->pagedir, f->esp, ubuf, ubuf + len);
+  }
   unsigned ret = copy_from_user (cur->pagedir, ubuf, kbuf, len);
   if (ret & 0x80000000) {
     /* page fault encountered */

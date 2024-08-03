@@ -83,7 +83,7 @@ vm_alloc_page (int zero, void *uaddr)
 #endif
 
   /* Record new user address in frame table. */
-  meta->frametb.upages[slot] = uaddr;
+  meta->frametb.upages[slot] = pg_round_down (uaddr);
 
   /* Check and initialize the page */
   if (zero)
