@@ -23,6 +23,14 @@ int vsnprintf (char *, size_t, const char *, va_list) PRINTF_FORMAT (3, 0);
 int putchar (int);
 int puts (const char *);
 
+/** Debug logging, to turn it off, uncomment line 31. */
+#define LOG(message, ...)                                                   \
+   printf ("[File %s] [Function %s] [Line %d] " message "\n",               \
+   __FILE__, __FUNCTION__, __LINE__, ##__VA_ARGS__)
+
+#undef LOG
+#define LOG(message, ...)
+
 /** Nonstandard functions. */
 void hex_dump (uintptr_t ofs, const void *, size_t size, bool ascii);
 void print_human_readable_size (uint64_t sz);
