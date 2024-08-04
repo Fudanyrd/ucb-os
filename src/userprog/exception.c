@@ -178,9 +178,16 @@ page_fault (struct intr_frame *f)
   user = (f->error_code & PF_U) != 0;
 
   if (user) {
+      struct thread *cur = thread_current ();
+      /* Detect writing to read-only-page or access violation */
+      if (!is_user_vaddr (fault_addr)) /* Definite access violation */
+        goto kill_user;
+      if (pagedir_get_page (cur->pagedir, fault_addr) != NULL)
+        goto kill_user;
 #ifdef VM
-      if (vm_fetch_page (pg_round_down (fault_addr)))
+      if (vm_fetch_page (pg_round_down (fault_addr))) {
         return;
+      }
 #endif
 
 #ifdef USERPROG
@@ -203,8 +210,8 @@ page_fault (struct intr_frame *f)
       return;
     }
 
-  kill_user:
 #endif
+  kill_user:
    /* elegantly terminate the program */
    f->eip = (void (*) (void)) f->eax;
    f->eax = -1;
