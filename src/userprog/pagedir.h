@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 uint32_t *pagedir_create (void);
+uint32_t *pagedir_lookup (uint32_t *pd, void *upage);
 void pagedir_destroy (uint32_t *pd);
 bool pagedir_set_page (uint32_t *pd, void *upage, void *kpage, bool rw);
 void *pagedir_get_page (uint32_t *pd, const void *upage);
