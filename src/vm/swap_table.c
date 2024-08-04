@@ -82,7 +82,7 @@ swap_table_free_ste (unsigned int ste)
 #ifdef ROBUST
   ASSERT ((ste & STE_V) != 0);
 #endif
-  swap_table_free_page (ste & (~0x00000007));
+  swap_table_free_page (ste >> 0x3U);
 }
 
 /* Free a swap table directory page. */
@@ -281,5 +281,19 @@ swaptb_map (struct swap_table_root *rt, void *uaddr, unsigned int blk)
     }
   ASSERT ((blk & 0X7) == 0);
   *ste = STE_V | blk; 
+  return 1;
+}
+
+/** Returns 1 if unmap is successful, 0 if the mapping does not exist
+   at user virtual address uaddr. */
+int 
+swaptb_unmap (struct swap_table_root *rt, void *uaddr)
+{
+  unsigned int *ste = swaptb_walk (rt, uaddr, 0);
+  if (ste == NULL || (*ste & STE_V) == 0)
+    {
+      return 0;
+    }
+  *ste = 0x0;
   return 1;
 }
