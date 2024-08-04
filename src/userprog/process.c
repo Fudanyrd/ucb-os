@@ -205,6 +205,8 @@ process_exit (void)
   print_process (cur->name, code);
   enum intr_level old_level;
   old_level = intr_disable ();
+
+  LOG ("Process terminated.");
   sc_ht_put (cur->tid, code); 
   intr_set_level (old_level);
 
@@ -790,6 +792,20 @@ setup_stack (void **esp)
   ftb->free_ptr = 1;
   ftb->pages[0] = kpage;
   ftb->upages[0] = ((uint8_t *) PHYS_BASE) - PGSIZE;
+  void *kpage2 = palloc_get_page (PAL_USER);
+  if (kpage2 == NULL)
+    {
+      /* Cannot allocate even 2 user pages?? */
+      ftb->pages[0] = NULL;
+      ftb->upages[0] = NULL;
+      palloc_free_page (kpage);
+      /* Let frametb_free call palloc_free_page. */
+      return false;
+    }
+  
+  /* Successfully get 2 user pages. */
+  ftb->pages[1] = kpage2;
+  ftb->free_ptr = 2;
 #endif
 
   if (kpage != NULL) 
