@@ -1,9 +1,11 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <random.h>
 #include <string.h>
 
 #include "threads/pte.h"
 #include "threads/vaddr.h"
+#include "threads/interrupt.h"
 #include "userprog/pagedir.h"
 #include "userprog/process.h"
 #include "vm-util.h"
@@ -24,21 +26,28 @@ vm_evict (struct thread *cur)
   uint32_t *pgtbl = cur->pagedir;
 
   /* Use random eviction policy. */
-  unsigned int slot = random_ulong () % (unsigned)ftb->free_ptr;
+  if (ftb->free_ptr <= 1)
+    PANIC ("user pool out of page");
+  unsigned int slot;
+select:  /* Pin the page on top of stack(i.e. don't evict it) */
+  slot = random_ulong () % (unsigned)ftb->free_ptr;
+  if (slot == 0U)
+    goto select;
+  ASSERT (slot < (unsigned)ftb->free_ptr);
   void *uaddr = ftb->upages[slot];
 
   /* Check the dirty bit of the old page, and write to somewhere */
-  if (pagedir_is_dirty (cur->pagedir, uaddr))
+  if (pagedir_is_writable (cur->pagedir, uaddr))
     {
       /* Write to swap device, first find 8 sectors */
       unsigned int sector = swaptb_alloc_sec ();
 
       /* Create mapping in the swap table */
       if (!swaptb_map (stb, uaddr, sector))
-        PANIC ("Should not fail swap table mapping");
+        PANIC ("Should not fail swap table mapping: at %p", uaddr);
 
       /* Write to disk, done. */ 
-      swaptb_write_page (sector, uaddr);
+      swaptb_write_page (sector, ftb->pages[slot]);
     }
   else
     {

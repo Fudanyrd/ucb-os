@@ -56,6 +56,18 @@ struct map_file
     int writable;       /**< is the mapped file read-only? */
   };
 
+/**< directory page of map file table(not used) */
+struct map_file_dir
+  {
+    struct map_file      *mfs[1024];
+  };
+
+/**< root page of map file table(not used) */
+struct map_file_rt
+  {
+    struct map_file_dir  *dirs[1024];
+  };
+
 
 /**< Frame table. */
 struct frame_table
@@ -130,6 +142,7 @@ void swaptb_free (struct swap_table_root *rt);
 unsigned int *swaptb_lookup (struct swap_table_root *rt, void *uaddr);
 int swaptb_map (struct swap_table_root *rt, void *uaddr, unsigned int blk);
 int swaptb_unmap (struct swap_table_root *rt, void *uaddr);
+unsigned int swaptb_count (struct swap_table_root *rt);
 
 /** +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
  *                        Block Swap Device IO
@@ -143,6 +156,7 @@ int swaptb_unmap (struct swap_table_root *rt, void *uaddr);
 static inline void
 swaptb_read_page (unsigned int sector, void *page)
 {
+  ASSERT ((sector & 0x7) == 0);
   struct block *blk = block_get_role (BLOCK_SWAP);
   for (int i = 0; i < SECTORS_PER_PAGE; ++i)
     {
@@ -160,6 +174,7 @@ swaptb_read_page (unsigned int sector, void *page)
 static inline void
 swaptb_write_page (unsigned int sector, const void *page)
 {
+  ASSERT ((sector & 0x7) == 0);
   struct block *blk = block_get_role (BLOCK_SWAP);
   /* Remember, a memory page equals 8 disk blocks */
   for (int i = 0; i < SECTORS_PER_PAGE; ++i)
