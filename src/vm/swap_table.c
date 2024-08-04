@@ -4,6 +4,7 @@
 #include "lib/kernel/bitmap.h"
 #include "devices/block.h"
 #include "threads/palloc.h"
+#include "threads/synch.h"
 #include "vm-util.h"
 
 /** +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -12,6 +13,9 @@
 
 /** For swap table to keep track of used disk spaces. */
 static struct bitmap *swap_table_bitmap;
+
+/** Avoid concurrent access to bitmap */
+static struct lock stb_bitmap_lock __attribute__((unused));
 
 /** Allocate a consecutive 8 disk blocks to store a memory page,
    Pay attention to how to translate from page index to block no:
@@ -52,6 +56,7 @@ swap_table_free_page (unsigned int page_idx)
 #endif
   // free the bit in the map
   bitmap_set (swap_table_bitmap, page_idx, 0);
+  return 0;
 }
 
 /**
@@ -200,6 +205,10 @@ vm_init (void)
   /* Test the size of swap table root and directory */
   STATIC_ASSERT (sizeof (struct swap_table_root) == PGSIZE);
   STATIC_ASSERT (sizeof (struct swap_table_dir) == PGSIZE);
+
+  /* Test the size of map file root and directory page */
+  STATIC_ASSERT (sizeof (struct map_file_rt) == PGSIZE);
+  STATIC_ASSERT (sizeof (struct map_file_dir) == PGSIZE);
 #endif
 
   /* Create a bitmap that supports a swap disk 
@@ -212,6 +221,8 @@ vm_init (void)
     {
       bitmap_set (swap_table_bitmap, i, 0);
     }
+  
+  lock_init (&stb_bitmap_lock);
 }
 
 /** Return an initialized swap table, NULL if failure */
@@ -265,10 +276,22 @@ int
 swaptb_map (struct swap_table_root *rt, void *uaddr, unsigned int blk)
 {
   unsigned int *ste = swaptb_walk (rt, uaddr, 1);
+#ifdef ROBUST
+  if (ste == NULL)
+    {
+      /* Report kernel page loss */
+      PANIC ("Kernel outof memory!!!");
+    }
+  if ((*ste & STE_V) != 0)
+    {
+      return 0;
+    }
+#else
   if (ste == NULL || (*ste & STE_V) != 0)
     {
       return 0;
     }
+#endif  /**< ROBUST */
   ASSERT ((blk & 0X7) == 0);
   *ste = STE_V | blk; 
   return 1;
@@ -286,4 +309,24 @@ swaptb_unmap (struct swap_table_root *rt, void *uaddr)
     }
   *ste = 0x0;
   return 1;
+}
+
+/** returns the number of pages that resides in swap device. */
+unsigned int 
+swaptb_count (struct swap_table_root *rt)
+{
+  unsigned int ret = 0;
+
+  struct swap_table_dir *dir;
+  for (int i = 0; i < 1024; ++i)
+    {
+      dir = rt->dirs[i];
+      if (dir == NULL)
+        continue;
+      for (int j = 0; j < 1024; ++j)
+        if (dir->entries[j] & STE_V)
+          ret += 1;
+    }
+
+  return ret;
 }
