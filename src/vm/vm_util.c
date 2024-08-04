@@ -141,6 +141,9 @@ vm_fetch_page (void *upage)
       /* Install the page */
       pagedir_set_page (cur->pagedir, upage, page, 1);
 
+      /* Manually unmap the page in the swap table */
+      *ste = 0x0;
+
       return page;
     }
   
