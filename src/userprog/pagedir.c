@@ -92,6 +92,16 @@ pagedir_lookup (uint32_t *pd, void *upage)
   return lookup_page (pd, upage, 0);
 }
 
+/** returns 1 if user page can write. */
+int 
+pagedir_is_writable (uint32_t *pd, const void *upage)
+{
+  unsigned int *pte = lookup_page (pd, upage, 0);
+  if (pte == NULL)
+    return 0;
+  return (*pte & PTE_W) != 0;
+}
+
 /** Adds a mapping in page directory PD from user virtual page
    UPAGE to the physical frame identified by kernel virtual
    address KPAGE.
