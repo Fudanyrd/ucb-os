@@ -6,16 +6,6 @@
 #include "threads/palloc.h"
 #include "vm-util.h"
 
-/**
- * Current status of development:
- * 
- * Compilation    [PASSED]
- * Functionality  [UNKNOWN]
- * Make-check     [PASSED]
- * 
- * Date Aug 1, 2024
- */
-
 /** +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
  *                          Helper functions
   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- */

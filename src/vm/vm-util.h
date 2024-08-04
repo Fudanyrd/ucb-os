@@ -129,6 +129,7 @@ struct swap_table_root *swaptb_create (void);
 void swaptb_free (struct swap_table_root *rt);
 unsigned int *swaptb_lookup (struct swap_table_root *rt, void *uaddr);
 int swaptb_map (struct swap_table_root *rt, void *uaddr, unsigned int blk);
+int swaptb_unmap (struct swap_table_root *rt, void *uaddr);
 
 /** +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
  *                        Block Swap Device IO

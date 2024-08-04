@@ -171,6 +171,24 @@ process_unblock (struct list *lst, tid_t tid, int code)
   }
 }
 
+/** Print exit status of a process */
+static void
+print_process (const char *name, int code)
+{
+  int it = 0;
+  while (name[it] == ' ') {
+    ++it;
+  }
+
+  while (name[it] != ' ' && name[it] != '\0')
+    {
+      putchar (name[it]);
+      ++it;
+    }
+  
+  printf (": exit(%d)\n", code);
+}
+
 /** Free the current process's resources. */
 void
 process_exit (void)
@@ -184,12 +202,7 @@ process_exit (void)
   /* I admit these code are specific to the test case 
     sc-bad-arg. PLEASE DO NOT OVERWRITE THE ADDRESS 0xbffffffc,
     FOR IT IS USED TO STORE POINTER TO META. */
-  if (m != NULL) {
-    if (m->argv != NULL)
-    printf ("%s: exit(%d)\n", m->argv, code);
-  }
-  else 
-  printf ("%s: exit(%d)\n", cur->name, code);
+  print_process (cur->name, code);
   enum intr_level old_level;
   old_level = intr_disable ();
   sc_ht_put (cur->tid, code); 

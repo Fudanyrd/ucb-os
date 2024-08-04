@@ -30,6 +30,7 @@ main (void)
 {
   /* walk down the buffer, set bit to 0. */
   char *b = buf;
+  printf ("buffer addr: %p\n", b);
   int64_t *pt = buf;
   int64_t *end = (int64_t *)(b + sizeof (buf));
 

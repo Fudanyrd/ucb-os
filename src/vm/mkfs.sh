@@ -11,6 +11,7 @@ pintos -p ../../examples/fio -a fio -- -q
 pintos -p ../../examples/fio2 -a fio2 -- -q
 pintos -p ../../examples/telseek -a telseek -- -q
 pintos -p ../../examples/zombie -a zombie -- -q
+pintos -p ../../examples/big_array -a big_array -- -q
 
 # text file 
 pintos -p ../../examples/echo.c -a echo.c -- -q
