@@ -12,6 +12,7 @@
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/malloc.h"
+#include "threads/pte.h"
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
@@ -309,9 +310,13 @@ copy_to_user (uint32_t *pagetable, void *kbuf, void *uaddr,
         if (!process_handle_pgfault (ptr))
           return 0x80000000 | (bytes - left);
         kaddr = pagedir_get_page (pagetable, ptr);
+        /* Check invalid write */
         ASSERT (kaddr != NULL);  // ok, continue execution
 #endif        /* +-+-+-+-+-+-+-+-+-+- end VM +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-*/
       }
+      uint32_t *pte = pagedir_lookup (pagetable, ptr);
+        if ((*pte & PTE_W) == 0) /* Access violation */
+          return 0x80000000 | (bytes - left);
 
       kaddr += uaddr - ptr;
       pgleft = PGSIZE - (uaddr - ptr);
