@@ -178,6 +178,11 @@ page_fault (struct intr_frame *f)
   user = (f->error_code & PF_U) != 0;
 
   if (user) {
+#ifdef VM
+      if (vm_fetch_page (pg_round_down (fault_addr)))
+        return;
+#endif
+
 #ifdef USERPROG
     /** Check and expand the stack */
     if (not_present && validate_stack (f->esp) && fault_addr >= f->esp - 32) {
@@ -197,10 +202,6 @@ page_fault (struct intr_frame *f)
       /** Successfully installed stack. */
       return;
     }
-#ifdef VM
-      if (vm_fetch_page (pg_round_down (fault_addr)))
-        return;
-#endif
 
   kill_user:
 #endif
