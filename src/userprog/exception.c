@@ -131,9 +131,12 @@ validate_stack (void *esp)
 int
 process_handle_pgfault (void *uaddr)
 {
-  struct process_meta *meta = thread_current ()->meta;
-  struct map_file *mf = map_file_lookup (meta->map_file_rt, uaddr);
-  return map_file_fill_page (mf, pg_round_down (uaddr));
+  /* [WARNING] repetition of code, almost same logic as in page_fault! */
+  if (!is_user_vaddr (uaddr)) /* Fail */
+    return 0;
+
+  void *res = vm_fetch_page (uaddr);
+  return res != NULL;
 }
 #endif
 
@@ -197,13 +200,13 @@ page_fault (struct intr_frame *f)
 #ifndef VM
       void *page = palloc_get_page (PAL_USER);
 #else
-      void *page = vm_alloc_page (0, pg_round_down (f->esp));
+      void *page = vm_alloc_page (0, pg_round_down (fault_addr));
 #endif
       if (page == NULL) 
         goto kill_user;
       
       struct thread *cur = thread_current ();
-      pagedir_set_page (cur->pagedir, pg_round_down (f->esp),
+      pagedir_set_page (cur->pagedir, pg_round_down (fault_addr),
                         page, true);
 
       /** Successfully installed stack. */
