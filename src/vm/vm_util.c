@@ -158,12 +158,24 @@ vm_fetch_page (void *upage)
   
   /* Not successful, try file mapping instead. */
   struct map_file *mf = map_file_lookup (meta->map_file_rt, upage);
+  if (mf == NULL)
+    goto vm_not_found;
   void *page = vm_alloc_page (0, upage);
   if (map_file_init_page (mf, page))
     {
       /* Record the mapping in the pagedir */
       pagedir_set_page (cur->pagedir, upage, page, mf->writable);
       return page;
+    }
+  else 
+    {
+      /* Clear the page in the mapping */
+      for (int i = 0; i < ftb->free_ptr; ++i) {
+        if (ftb->pages[i] == page)
+          {
+            ftb->upages[i] = NULL;
+          }
+      }
     }
 
 vm_not_found:
