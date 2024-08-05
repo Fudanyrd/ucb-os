@@ -19,8 +19,10 @@ validate_buf (void)
 
   while (pt != end)
     {
-      if (*pt != MAGIC) /* Fail */
+      if (*pt != MAGIC) { /* Fail */
+        printf ("expected %lx, got %lx.\n", MAGIC, *pt);
         exit (2);
+      }
       pt++;
     }
 }

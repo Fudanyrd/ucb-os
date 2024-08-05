@@ -6,7 +6,7 @@ SRCDIR = ..
 PROGS = cat cmp cp crrm echo exit fio fio2 halt hang hex-dump \
   ls mcat mcp mkdir pwd rm shell \
 	bubsort insult lineup matmult recursor parrot telseek \
-	zombie big_array
+	zombie big_array big_stack
 
 # Should work from project 2 onward.
 cat_SRC = cat.c
@@ -31,6 +31,7 @@ zombie_SRC = zombie.c
 
 # Should work in project 3; also in project 4 if VM is included.
 big_array_SRC = big_array.c
+big_stack_SRC = big_stack.c
 bubsort_SRC = bubsort.c
 matmult_SRC = matmult.c
 mcat_SRC = mcat.c
