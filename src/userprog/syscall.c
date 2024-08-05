@@ -169,7 +169,7 @@ copy_from_user (uint32_t *pagetable, void *uaddr, void *kbuf,
         /* encounter page fault, abort(else will crash!) */
         return (bytes - left) | 0x80000000;
 #else         /* +-+-+-+-+-+-+-+-+-+- is VM +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-*/
-        if (!process_handle_pgfault (ptr))
+        if (!process_handle_pgfault (ptr, NULL))
           return (bytes - left) | 0x80000000;
         kaddr = pagedir_get_page (pagetable, ptr);
         ASSERT (kaddr != NULL);
@@ -241,7 +241,7 @@ cpstr_from_user (uint32_t *pagetable, char *uaddr, char *kbuf,
         /* encounter page fault, abort(else will crash!) */
         return 2;
 #else         /* +-+-+-+-+-+-+-+-+-+- is VM +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-*/
-        if (!process_handle_pgfault (ptr))
+        if (!process_handle_pgfault (ptr, NULL))
           return 2;
         kaddr = pagedir_get_page (pagetable, ptr);
         ASSERT (kaddr != NULL);  // ok, continue execution
@@ -283,7 +283,7 @@ cpstr_from_user (uint32_t *pagetable, char *uaddr, char *kbuf,
  */
 static unsigned int
 copy_to_user (uint32_t *pagetable, void *kbuf, void *uaddr, 
-              unsigned int bytes)
+              unsigned int bytes, void *esp)
 {
   /* validate parameters */
   ASSERT (pagetable != NULL && kbuf != NULL);
@@ -307,7 +307,7 @@ copy_to_user (uint32_t *pagetable, void *kbuf, void *uaddr,
         /* encounter page fault, abort(else will crash!) */
         return 0x80000000 | (bytes - left);
 #else         /* +-+-+-+-+-+-+-+-+-+- is VM +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-*/
-        if (!process_handle_pgfault (ptr))
+        if (!process_handle_pgfault (ptr, esp))
           return 0x80000000 | (bytes - left);
         kaddr = pagedir_get_page (pagetable, ptr);
         /* Check invalid write */
@@ -845,9 +845,9 @@ read_executor (void *args)
   }
   if (ret) {
     /* If ret == 0(unusual condition), then don't have to install stack! */
-    sc_install_stack (cur->pagedir, f->esp, ubuf, ubuf + ret);
+    // sc_install_stack (cur->pagedir, f->esp, ubuf, ubuf + ret);
   }
-  ret = copy_to_user (cur->pagedir, kbuf, ubuf, ret);
+  ret = copy_to_user (cur->pagedir, kbuf, ubuf, ret, f->esp);
   free (kbuf);
   if (ret & 0x80000000) {
     /* page fault detected! */
@@ -900,7 +900,7 @@ write_executor (void *args)
   kbuf[len] = '\0';
 
   if (len != 0) {
-    sc_install_stack (cur->pagedir, f->esp, ubuf, ubuf + len);
+    // sc_install_stack (cur->pagedir, f->esp, ubuf, ubuf + len);
   }
   unsigned ret = copy_from_user (cur->pagedir, ubuf, kbuf, len);
   if (ret & 0x80000000) {

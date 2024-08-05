@@ -59,7 +59,7 @@ void process_activate (void);
 void process_unblock (struct list*, tid_t, int);
 void *process_get_page (enum palloc_flags);
 #ifdef VM
-int process_handle_pgfault (void *uaddr);
+int process_handle_pgfault (void *uaddr, void *esp);
 #endif
 
 /** +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-

@@ -129,14 +129,28 @@ validate_stack (void *esp)
 #include "vm/vm-util.h"
 /** Handle page fault happened at uaddr. Returns true if successful */
 int
-process_handle_pgfault (void *uaddr)
+process_handle_pgfault (void *uaddr, void *esp)
 {
   /* [WARNING] repetition of code, almost same logic as in page_fault! */
   if (!is_user_vaddr (uaddr)) /* Fail */
     return 0;
 
   void *res = vm_fetch_page (uaddr);
-  return res != NULL;
+
+  if (res != NULL)
+    return res;
+  /* Try to install the stack. */
+  if (esp == NULL) /* If esp is null, abort. */
+    return res != NULL;
+  
+  if (!validate_stack (esp) || uaddr < esp)
+    return 0;
+  
+  /* Install the stack. */
+  void *page = vm_alloc_page (0, uaddr);
+  struct thread *cur = thread_current ();
+  pagedir_set_page (cur->pagedir, pg_round_down (uaddr), page, true);
+  return page != NULL;
 }
 #endif
 
