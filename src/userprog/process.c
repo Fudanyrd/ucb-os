@@ -752,10 +752,12 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       if (mf == NULL)  // allocation failure
         return false;
 
+      /** initialize map_file obj */
       mf->fobj = file_reopen (file); 
-      mf->writable = writable;
+      mf->writable = (short)writable;
       mf->offset = ofs;
       mf->read_bytes = page_read_bytes;
+      mf->mmap = (short)0;
       if (!map_file (rt, mf, upage)) {
         /** Oops, failure to create mapping */
         return false;

@@ -33,5 +33,7 @@
 #define NFRAME 16
 
 #define VM
+/** At most map 8 files for a single process */
+#define NMMAP 8
 
 #endif /**< userprog/mode.h */

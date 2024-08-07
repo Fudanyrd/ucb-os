@@ -44,6 +44,7 @@ struct process_meta
     void           *map_file_rt;     /**< Root of file mapping table. */
     struct swap_table_root *swaptb;  /**< Swap table */
     struct frame_table      frametb; /**< Frame table */
+    void           *mmaptb[NMMAP];   /**< mmap table */
 #endif
   };
 
