@@ -53,8 +53,19 @@ struct map_file
     struct file *fobj;  /**< file object to map, must be safe to close */
     off_t offset;       /**< offset */
     int read_bytes;     /**< read some bytes, the rest set to 0 */
-    int writable;       /**< is the mapped file read-only? */
+    short writable;       /**< is the mapped file read-only? */
+    short mmap;           /**< 1 if created via syscall mmap */
+    /**< see examples below! */
   };
+
+/** return true if a mf is created via mmap */
+static inline int mf_is_mmap (struct map_file *mf) {
+  return (int)mf->mmap;
+}
+/** return true if a mf is writable */
+static inline int mf_is_writable (struct map_file *mf) {
+  return (int)mf->writable;
+}
 
 /**< directory page of map file table(not used) */
 struct map_file_dir
