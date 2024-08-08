@@ -32,7 +32,6 @@
 /**< Number of frames for each process */
 #define NFRAME 16
 
-#define VM
 /** At most map 8 files for a single process */
 #define NMMAP 8
 

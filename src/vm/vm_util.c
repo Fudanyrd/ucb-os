@@ -36,6 +36,21 @@ select:  /* Pin the page on top of stack(i.e. don't evict it) */
   ASSERT (slot < (unsigned)ftb->free_ptr);
   void *uaddr = ftb->upages[slot];
 
+  /* If uaddr is memory mapped page(and it is dirty), write to 
+     original file directly. Then it can be reloaded from disk
+     if necessary, and disk is updated as file is updated in 
+     memory. */
+  struct map_file *mf = map_file_lookup (meta->map_file_rt, uaddr);
+  if (uaddr == NULL)
+    ASSERT (mf == NULL);
+  if (mf != NULL && mf->mmap) {
+    if (pagedir_is_dirty (cur->pagedir, uaddr)) {
+      /* Write to original file. */
+      file_write_at (mf->fobj, uaddr, mf->read_bytes, mf->offset);
+    }
+    goto evict_end;
+  }
+
   /* Check the dirty bit of the old page, and write to somewhere */
   if (pagedir_is_writable (cur->pagedir, uaddr))
     {
@@ -54,6 +69,7 @@ select:  /* Pin the page on top of stack(i.e. don't evict it) */
       /* Ignore(can be load again from file mapping table )*/
     }
 
+evict_end:
   /* Clear the mapping in page directory(Why?). */
   pagedir_clear_page (pgtbl, uaddr);
 
@@ -180,4 +196,32 @@ vm_fetch_page (void *upage)
 
 vm_not_found:
   return NULL;
+}
+
+/** returns true if upage is present, regardless of where it actually is. */
+int 
+vm_is_present (void *upage)
+{
+  /* Initialize */
+  struct thread *cur = thread_current ();
+  struct process_meta *meta = cur->meta;
+  uint32_t *pgtbl = cur->pagedir;
+
+  /** Look into page table. */
+  if (pagedir_get_page (pgtbl, upage) != NULL)
+    return 1;
+
+  /* Look into swap device. */
+  struct swap_table_root *swaptb = meta->swaptb;
+  unsigned int *ste = (swaptb_lookup (swaptb, upage));
+  if (ste != NULL && (*ste & STE_V) != 0)
+    return 1;
+
+  /* Look into map file table. */
+  struct map_file *mf = map_file_lookup (meta->map_file_rt, upage);
+  if (mf != NULL)
+    return 1;
+
+  /* Nowhere can the page be found! */
+  return 0;
 }

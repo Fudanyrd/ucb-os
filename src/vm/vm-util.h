@@ -29,6 +29,7 @@
 void vm_init (void);
 void *vm_alloc_page (int zero, void *uaddr);
 void *vm_fetch_page (void *upage);
+int vm_is_present (void *upage);
 
 /** +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
  *                         Data Structures 
@@ -111,11 +112,19 @@ struct swap_table_root
   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- */
 
 struct map_file *map_file_lookup (void *rt, void *uaddr);
+struct map_file **map_file_walk (void *rt, void *uaddr);
 bool map_file (void *rt, struct map_file *mf, void *uaddr);
 void *map_file_init (void);
 void map_file_clear (void *);
 int map_file_fill_page (struct map_file *mf, void *upage);
 int map_file_init_page (struct map_file *mf, void *kpage);
+
+/** +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+ *                       Memory Mapped File Impl 
+  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- */
+
+int vm_mmap (struct file *fobj, void *upage);
+int vm_unmap (int md);
 
 /** +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
  *                          Swap Tables

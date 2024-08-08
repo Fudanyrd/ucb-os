@@ -1040,7 +1040,14 @@ mmap_executor (void *args)
   }
 
   /* execute */
-  return -1;  // NOT IMPLEMENTED
+  struct process_meta *meta = cur->meta;
+  fd -= 2;
+  if (fd < 0 || fd >= MAX_FILE)
+    return -1;
+  struct file *fobj = meta->ofile[fd];
+  if (fobj == NULL)
+    return -1;
+  return vm_mmap (fobj, maddr);  // NOT IMPLEMENTED
 }
 
 static int 
@@ -1063,5 +1070,5 @@ munmap_executor (void *args)
   }
 
   /* Execute */
-  return -1;  // NOT IMPLEMENTED
+  return vm_unmap (fd);  // NOT IMPLEMENTED
 }

@@ -41,6 +41,22 @@ mf_dir_index (void *uaddr) {
 #endif // ROBUST
 }
 
+/** Retrieve a slot in the map file table. */
+struct map_file **
+map_file_walk (void *rt, void *uaddr)
+{
+  /* At root level */
+  struct map_file_rt *mfrt = rt;
+  unsigned int idx = mf_root_index (uaddr);
+  struct map_file_dir *mfdir = mfrt->dirs[idx];
+  if (mfdir == NULL) /* Cannot walk deeper. */
+    return NULL;
+
+  /* At dir level*/
+  idx = mf_dir_index (uaddr);
+  return &(mfdir->mfs[idx]); 
+}
+
 /** Initialize the file mapping table. */
 void *
 map_file_init ()

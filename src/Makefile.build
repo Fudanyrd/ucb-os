@@ -68,6 +68,7 @@ vm_SRC = vm/map_file.c              # map_file impl
 vm_SRC +=vm/swap_table.c            # swap table impl
 vm_SRC +=vm/frame_table.c           # frame table impl
 vm_SRC +=vm/vm_util.c               # utilities
+vm_SRC +=vm/mmap.c                  # mmap syscall impl
 
 # Filesystem code.
 filesys_SRC  = filesys/filesys.c	# Filesystem core.
