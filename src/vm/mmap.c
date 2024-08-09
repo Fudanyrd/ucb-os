@@ -180,7 +180,9 @@ unmap_from (void *map_file_rt, void *upage,
       /* If writeback, present and dirty, writeback. */
       if (writeback && pagedir_is_dirty (pgtbl, upage)) {
         /* Hint: if upage is dirty, then it must exist in memory! */
-        file_write_at (mf->fobj, upage, mf->read_bytes, mf->offset);
+        void *kpage = pagedir_get_page (thread_current ()->pagedir, upage);
+        if (kpage != NULL)
+          file_write_at (mf->fobj, kpage, mf->read_bytes, mf->offset);
       }
       
       /* If writeback = 0, then it must be from mmap; else from munmap. */

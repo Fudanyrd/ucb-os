@@ -222,10 +222,12 @@ process_exit (void)
   printf ("automatically closed %d file(s)\n", closed);
 #else
   /* Implicitly unmap all files. */
+#ifdef VM
   for (int i = 0; i < NMMAP; ++i) {
     if (m->mmaptb[i] != NULL)
       vm_unmap (i);
   }
+#endif
   for (int i = 0; i < MAX_FILE; ++i) {
     if (m != NULL)
     fdfree (i + 2);

@@ -1018,6 +1018,10 @@ close_executor (void *args)
 static int 
 mmap_executor (void *args)
 {
+#ifndef VM
+  /**< No implementation */
+  return -1;
+#else
   /* Syscall start */
   struct intr_frame *f = args;
   void *argv = syscall_args (f);
@@ -1048,11 +1052,16 @@ mmap_executor (void *args)
   if (fobj == NULL)
     return -1;
   return vm_mmap (fobj, maddr);  // NOT IMPLEMENTED
+#endif /**< VM */
 }
 
 static int 
 munmap_executor (void *args)
 {
+#ifndef VM
+  /**< No implementation */
+  return 0;
+#else
   /* Syscall start */
   struct intr_frame *f = args;
   void *argv = syscall_args (f);
@@ -1071,4 +1080,5 @@ munmap_executor (void *args)
 
   /* Execute */
   return vm_unmap (fd);  // NOT IMPLEMENTED
+#endif /**< VM */
 }
