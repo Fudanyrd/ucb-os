@@ -52,14 +52,12 @@ file_reopen (struct file *file)
 void
 file_close (struct file *file) 
 {
-  lock_acquire (filesys_lock);
   if (file != NULL)
     {
       file_allow_write (file);
       inode_close (file->inode);
       free (file); 
     }
-  lock_release (filesys_lock);
 }
 
 /** Returns the inode encapsulated by FILE. */
@@ -77,10 +75,8 @@ file_get_inode (struct file *file)
 off_t
 file_read (struct file *file, void *buffer, off_t size) 
 {
-  lock_acquire (filesys_lock);
   off_t bytes_read = inode_read_at (file->inode, buffer, size, file->pos);
   file->pos += bytes_read;
-  lock_release (filesys_lock);
   return bytes_read;
 }
 
@@ -105,10 +101,8 @@ file_read_at (struct file *file, void *buffer, off_t size, off_t file_ofs)
 off_t
 file_write (struct file *file, const void *buffer, off_t size) 
 {
-  lock_acquire (filesys_lock);
   off_t bytes_written = inode_write_at (file->inode, buffer, size, file->pos);
   file->pos += bytes_written;
-  lock_release (filesys_lock);
   return bytes_written;
 }
 
