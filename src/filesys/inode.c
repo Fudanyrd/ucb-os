@@ -555,6 +555,10 @@ static off_t
 inode_seek_read (const struct inode_disk *di, char *buf, off_t offset, 
                  off_t size)
 {
+  if (di->magic != INODE_MAGIC) {
+    PANIC ("not inode_disk");
+  }
+
   if (offset >= MAXFILE) /* Seek beyond largest file */
     return 0;  
   if (offset >= di->size) {
@@ -678,6 +682,71 @@ sec_not_found: /* Sector not found, fill with zero. */
   return bytes;
 }
 
+/** Seek and read a page into buffer. 
+ * @param di disk inode representing an inode
+ * @param buf buffer to read data to
+ * @param offset seek file position
+ * @param size maximum bytes read
+ * @return number of bytes read into buffer.
+*/
+static off_t
+inode_seek_write (struct inode_disk *di, const char *buf, off_t offset, 
+                  off_t size)
+{
+  if (offset >= MAXFILE) {
+    /* Cannot write outside of maxfile. */
+    return 0;
+  }
+  if (di->magic != INODE_MAGIC) {
+    PANIC ("not inode_disk");
+  }
+  const off_t sec_of = sec_off (offset);
+  /* bytes = min(bytes, size); */
+  const off_t bytes = (size >= (BLOCK_SECTOR_SIZE - sec_of)) 
+                    ? (BLOCK_SECTOR_SIZE - sec_of) : size;
+
+  /* Try direct block first. */
+  if (offset < DIRECT_SIZE) {
+    /* Index into the page */
+    const int isec = offset / BLOCK_SECTOR_SIZE;
+    ASSERT (isec <= 123);
+    /* Test the sector. */
+    if (di->addrs[isec] == INODE_INVALID) {
+      /* create and cache the page. */
+      int new_sec;
+      if (!free_map_allocate (1, &new_sec)) {
+        /* failure */
+        return 0;
+      }
+
+      di->addrs[isec] = new_sec;
+    }
+
+    /* fetch the page and write. */
+    char *dat = bio_write (di->addrs[isec]);
+    if (!bio_pin_sec (dat)) {
+      PANIC ("bio pin");
+    }
+    memcpy (dat + sec_of, buf, bytes);
+    if (!bio_unpin_sec (dat)) {
+      PANIC ("bio unpin");
+    }
+
+    return bytes;
+  }
+
+  /* Then try single indirect block. */
+  offset -= DIRECT_SIZE;
+  if (offset < SINGLE_INDIR_SIZE) {
+    PANIC ("not implemented");
+  }
+
+  /* Then try doubly indirect block */
+  PANIC ("not implemented");
+
+  return bytes;
+}
+
 /** List of open inodes, so that opening a single inode twice
    returns the same `struct inode'. */
 static struct list open_inodes;
@@ -698,6 +767,11 @@ inode_init (void)
   STATIC_ASSERT (sizeof (struct indirect_block) == BLOCK_SECTOR_SIZE);
   /* Must support file of 8MB or larger */
   STATIC_ASSERT (MAXFILE >= (8 * 1024 * 1024));
+
+  /* Inode sizes should be sector-aligned. */
+  STATIC_ASSERT (DIRECT_SIZE % BLOCK_SECTOR_SIZE == 0);
+  STATIC_ASSERT (SINGLE_INDIR_SIZE % BLOCK_SECTOR_SIZE == 0);
+  STATIC_ASSERT (DOUBLY_INDIR_SIZE % BLOCK_SECTOR_SIZE == 0);
 
   list_init (&open_inodes);
   lock_init (&inode_list_lock);
