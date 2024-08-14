@@ -15,8 +15,8 @@ struct bio_pack
 
 void bio_init (void);
 int bio_pin (block_sector_t sec);
-int bio_pin_sec (char *sec);
-int bio_unpin_sec (char *sec);
+int bio_pin_sec (const char *sec);
+int bio_unpin_sec (const char *sec);
 int bio_unpin (block_sector_t sec);
 void bio_flush (void);
 struct bio_pack bio_new (void);

@@ -315,7 +315,7 @@ bio_unpin (block_sector_t sec)
 
 /** Pin the sector given in sec. */
 int 
-bio_pin_sec (char *sec)
+bio_pin_sec (const char *sec)
 {
   if (sec < bio_base || sec >= bio_end)
     {
@@ -335,7 +335,7 @@ bio_pin_sec (char *sec)
 
 /** Unpin the sector given in sec. */
 int 
-bio_unpin_sec (char *sec)
+bio_unpin_sec (const char *sec)
 {
   if (sec < bio_base || sec >= bio_end)
     {

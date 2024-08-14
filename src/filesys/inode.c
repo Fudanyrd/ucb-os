@@ -537,24 +537,87 @@ inode_deallocate (struct inode *ino)
   free_map_release (ino->sector, 1U);
 }
 
-/** Seek a position of inode */
-static const char *
-inode_seek_read (struct inode *ino, const struct inode_disk *di, off_t offset)
+/** Return the offset in a sector. */
+static inline off_t
+sec_off (off_t offset)
+{
+  return offset % BLOCK_SECTOR_SIZE;
+}
+
+/** Seek and read a page into buffer. 
+ * @return number of bytes read into buffer.
+*/
+static off_t
+inode_seek_read (struct inode *ino, const struct inode_disk *di, 
+                 char *buf, off_t offset)
 {
   ASSERT (lock_held_by_current_thread (&ino->lk));
-  if (offset >= MAXFILE) /* Seeking outside of largest file */
-    return NULL;
-
-  /* By specification, will use ino->data to communicate */
-  if (di == NULL)
-    PANIC ("ino->data is invalid");
-
-  if (offset < DIRECT_SIZE) {
-    /* Seek into direct size. */
-    int idx __attribute__((unused)) = offset / BLOCK_SECTOR_SIZE;
-
-    return NULL;
+  if (offset >= MAXFILE) /* Seek beyond largest file */
+    return 0;  
+  if (offset >= di->size) {
+    /* Seek outside the file */
+    return 0;
   }
+  
+  if (offset < DIRECT_SIZE) {
+    int idx = offset / BLOCK_SECTOR_SIZE;
+    ASSERT (idx < 123);
+    /* Sector of data page */
+    block_sector_t dsec = di->addrs[idx];
+    /* bytes to be read. */
+    off_t bytes = BLOCK_SECTOR_SIZE - sec_off (offset);
+
+    if (dsec == INODE_INVALID) {
+      /* Lazily allocated page is filled with 0. */
+      memset (buf, 0, bytes);
+      return bytes;
+    }
+
+    /* Fetch the data sector and pin it. */
+    const char *dat = bio_read (dsec);
+    if (!bio_pin_sec (dat))
+      PANIC ("bio pin");
+
+    /* Copy the bytes */
+    memcpy (buf, dat + sec_off (offset), bytes);
+
+    /* unpin the data page, done. */
+    if (!bio_unpin_sec (dat))
+      PANIC ("bio unpin");
+    return bytes;
+  }
+
+  /* Look into singly indirect sectors. */
+  offset -= DIRECT_SIZE;
+  if (offset < SINGLE_INDIR_SIZE) {
+    const struct indirect_block *indir = bio_read (di->addrs[123]);
+    if (!bio_pin_sec (indir))
+      PANIC ("bio pin");
+    /* Get data sector */
+    int dsec = indir->addrs[offset / BLOCK_SECTOR_SIZE];
+    if (!bio_unpin_sec (indir))
+      PANIC ("bio unpin");
+    
+    /* bytes to be read. */
+    off_t bytes = BLOCK_SECTOR_SIZE - sec_off (offset);
+
+    /* validate dsec */
+    if (dsec == INODE_INVALID) {
+      memset (buf, 0, bytes);
+      return bytes;
+    }
+    
+    /* Read data in sector dsec. */
+    const char *dat = bio_read (dsec);
+    if (!bio_pin_sec (dat))
+      PANIC ("bio pin");
+    memcpy (buf, dat + sec_off (offset), bytes);
+    return bytes;
+  }
+
+  /* Look into doubly indirect sectors. */
+  offset -= SINGLE_INDIR_SIZE;
+  PANIC ("not implemented.");
 }
 
 /** List of open inodes, so that opening a single inode twice
