@@ -545,13 +545,16 @@ sec_off (off_t offset)
 }
 
 /** Seek and read a page into buffer. 
+ * @param di disk inode representing an inode
+ * @param buf buffer to read data to
+ * @param offset seek file position
+ * @param size maximum bytes read
  * @return number of bytes read into buffer.
 */
 static off_t
-inode_seek_read (struct inode *ino, const struct inode_disk *di, 
-                 char *buf, off_t offset)
+inode_seek_read (const struct inode_disk *di, char *buf, off_t offset, 
+                 off_t size)
 {
-  ASSERT (lock_held_by_current_thread (&ino->lk));
   if (offset >= MAXFILE) /* Seek beyond largest file */
     return 0;  
   if (offset >= di->size) {
@@ -566,6 +569,8 @@ inode_seek_read (struct inode *ino, const struct inode_disk *di,
     block_sector_t dsec = di->addrs[idx];
     /* bytes to be read. */
     off_t bytes = BLOCK_SECTOR_SIZE - sec_off (offset);
+    /* bytes = min(size, bytes); */
+    bytes = bytes > size ? size : bytes;
 
     if (dsec == INODE_INVALID) {
       /* Lazily allocated page is filled with 0. */
@@ -600,6 +605,8 @@ inode_seek_read (struct inode *ino, const struct inode_disk *di,
     
     /* bytes to be read. */
     off_t bytes = BLOCK_SECTOR_SIZE - sec_off (offset);
+    /* bytes = min(size, bytes); */
+    bytes = bytes > size ? size : bytes;
 
     /* validate dsec */
     if (dsec == INODE_INVALID) {
@@ -612,12 +619,63 @@ inode_seek_read (struct inode *ino, const struct inode_disk *di,
     if (!bio_pin_sec (dat))
       PANIC ("bio pin");
     memcpy (buf, dat + sec_off (offset), bytes);
+    if (!bio_unpin_sec (dat))
+      PANIC ("bio unpin");
     return bytes;
   }
 
-  /* Look into doubly indirect sectors. */
+  /* compute indexes. */
   offset -= SINGLE_INDIR_SIZE;
-  PANIC ("not implemented.");
+  off_t bytes = BLOCK_SECTOR_SIZE - sec_off (offset);  /* Bytes read. */
+  /* bytes = min(size, bytes); */
+  bytes = bytes > size ? size : bytes;
+  const int ind1 = offset / SINGLE_INDIR_SIZE; /* index into first directory */
+  const int ind2 = (offset % SINGLE_INDIR_SIZE) / BLOCK_SECTOR_SIZE;
+                                        /* index into second directory */ 
+  ASSERT (ind1 < 128 && ind2 < 128);
+
+  /* pin first level directory block, read and unpin. */
+  const struct indirect_block *isec1 = bio_read (di->addrs[124]);
+  if (!bio_pin_sec (isec1)) {
+    PANIC ("bio pin");
+  }
+  const int isec2id = isec1->addrs[ind1];
+  if (!bio_unpin_sec (isec1)) {
+    PANIC ("bio unpin");
+  }
+  if (isec2id == INODE_INVALID) { /* not found, fill 0. */
+    goto sec_not_found;
+  }
+
+  /* pin second level directory block, read and unpin. */
+  const struct indirect_block *isec2 = bio_read (isec2id); 
+  if (!bio_pin_sec (isec2)) {
+    PANIC ("bio pin");
+  }
+  const int dsec = isec2->addrs[ind2];
+  if (!bio_unpin_sec (isec2)) {
+    PANIC ("bio unpin");
+  }
+  if (dsec == INODE_INVALID) { /* not found, fill 0. */
+    goto sec_not_found;
+  }
+
+  /* pin data block, read and unpin. */
+  const char *idat = bio_read (dsec);
+  if (!bio_pin_sec (idat)) {
+    PANIC ("bio pin");
+  }
+  memcpy (buf, idat + sec_off (offset), bytes);
+  if (!bio_unpin_sec (idat)) {
+    PANIC ("bio unpin");
+  }
+
+  /* sector found, done. */
+  return bytes;
+
+sec_not_found: /* Sector not found, fill with zero. */
+  memset (buf, 0, bytes);
+  return bytes;
 }
 
 /** List of open inodes, so that opening a single inode twice
@@ -816,6 +874,14 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
 
   /* Seek offset */
   while (size > 0) {
+    /* call reader. */
+    const off_t bread = inode_seek_read (sec, buffer, offset, size);
+    ASSERT (bread <= size);
+
+    /* Advance. */
+    offset += bread;
+    buffer += bread;
+    size -= bread;
   }
 
   /* Done. */
@@ -824,6 +890,19 @@ read_done:
     PANIC ("bio unpin");
   lock_release (&inode->lk);
   return bytes_read;
+}
+
+/** Writes SIZE bytes from BUFFER into INODE, starting at OFFSET.
+   Returns the number of bytes actually written, which may be
+   less than SIZE if end of file is reached or an error occurs.
+   (Normally a write at end of file would extend the inode, but
+   growth is not yet implemented.) */
+off_t
+inode_write_at (struct inode *inode, const void *buffer_, off_t size,
+                off_t offset) 
+{
+  /* Not implemented. */
+  return 0;
 }
 
 /** Disables writes to INODE.
