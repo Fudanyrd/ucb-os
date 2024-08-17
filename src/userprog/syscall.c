@@ -1100,6 +1100,30 @@ chdir_executor (void *args)
   struct intr_frame *f = args;
   void *argv = syscall_args (f);
 
+  /* Parse args */
+  char *fn;
+  unsigned int bytes;
+  struct thread *cur = thread_current ();
+  bytes = copy_from_user (cur->pagedir, argv, &fn, sizeof (fn));
+  if (bytes != sizeof (fn))
+    return 0;
+  char buf[16 * 16];
+  int ret = cpstr_from_user (cur->pagedir, fn, buf, sizeof buf);
+
+  /* Error handling */
+  switch (ret) {
+    case 1: {
+      /* file length exceed limit */
+      return 0;
+    }
+    case 2: {
+      /* page fault, terminate */
+      process_terminate (-1);
+    }
+  }
+
+  return fs_chdir (buf);
+chdir_fail:
   /* not implemented */
   return 0;
 }
@@ -1111,6 +1135,30 @@ mkdir_executor (void *args)
   struct intr_frame *f = args;
   void *argv = syscall_args (f);
 
+  /* Parse args */
+  char *fn;
+  unsigned int bytes;
+  struct thread *cur = thread_current ();
+  bytes = copy_from_user (cur->pagedir, argv, &fn, sizeof (fn));
+  if (bytes != sizeof (fn))
+    return 0;
+  char buf[16 * 16];
+  int ret = cpstr_from_user (cur->pagedir, fn, buf, sizeof buf);
+
+  /* Error handling */
+  switch (ret) {
+    case 1: {
+      /* file length exceed limit */
+      return 0;
+    }
+    case 2: {
+      /* page fault, terminate */
+      process_terminate (-1);
+    }
+  }
+
+  return fs_mkdir (buf, 40); 
+mkdir_fail:
   /* not implemented */
   return 0;
 }

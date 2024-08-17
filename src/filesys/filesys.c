@@ -153,7 +153,7 @@ filesys_walk (int from, const char *path, char *tmp)
   from = dir_sec (dir, tmp);
 
   /* dir_close shall close the inode too. */
-  dir_close (ino);
+  dir_close (dir);
 
   /* Recurse, reusing the tmp buffer. */
   return filesys_walk (from, path + iter, tmp);
@@ -178,6 +178,9 @@ filesys_leave (int from, const char *path, char *tmp)
   int iter = 0;
   for (; path[iter] != '/' && path[iter] != '\0'; ++iter) {
     tmp[iter] = path[iter];
+    /* check overflow */
+    if (iter >= NAME_MAX)
+      return INVALID_SECTOR;
   }
   /* Set terminator. */
   tmp[iter] = '\0';
@@ -203,7 +206,7 @@ filesys_leave (int from, const char *path, char *tmp)
   from = dir_sec (dir, tmp);
 
   /* dir_close shall close the inode too. */
-  dir_close (ino);
+  dir_close (dir);
 
   /* Recurse, reusing the tmp buffer. */
   return filesys_leave (from, path + iter, tmp);
@@ -273,6 +276,62 @@ fs_create (const char *name, off_t initial_size)
   return ret;
 }
 
+/* Make directory */
+int 
+fs_mkdir (const char *name, off_t initial_size)
+{
+  int absolute = 0;
+  if (*name == '/') {
+    absolute = 1;
+    /* Abolute path. */
+    while (*name == '/') {
+      ++name;
+    }
+  }
+
+  /* Starting directory. */
+  int from = absolute ? ROOT_DIR_SECTOR : fs_get_pwd ();
+
+  /* Walk to destination */
+  char tmp[NAME_MAX + 2];  /**< buffer */
+  int dest;                /**< sector of destination */
+  dest = filesys_leave (from, name, tmp);
+
+  if (dest == INVALID_SECTOR) {
+    /* Fail */
+    return 0;
+  }
+
+  /* Open directory. */
+  struct inode *ino = inode_open (dest);
+  struct dir *dir = dir_open (ino);
+  ASSERT (ino != NULL && dir != NULL && inode_typ (ino) == INODE_DIR);
+
+  block_sector_t sec = 0;
+  int ret = (
+    free_map_allocate (1U, &sec) &&
+    inode_create (sec, initial_size, INODE_DIR) &&
+    dir_add (dir, tmp, sec)
+  );
+  if (ret == 0 && sec != 0) 
+    free_map_release (sec, 1);
+  dir_close (dir);
+
+  if (ret == 0)
+    return 0;
+
+  /* Create . and .. entry. */
+  ino = inode_open (sec);
+  dir = dir_open (ino);
+  if (!(dir_add (dir, ".", sec) && dir_add (dir, "..", dest))) {
+    /* Delete this inode. */
+    inode_remove (ino);
+    ret = 0;
+  } 
+  dir_close (dir);
+  return ret;
+}
+
 /** Open a file considering relative path name */
 struct file *
 fs_open (const char *name)
@@ -309,4 +368,34 @@ fs_open (const char *name)
   dir_close (dir);
 
   return file_open (ret);
+}
+
+/* Change the directory of the calling thread. */
+int 
+fs_chdir (const char *name)
+{
+  int absolute = 0;
+  if (*name == '/') {
+    absolute = 1;
+    /* Abolute path. */
+    while (*name == '/') {
+      ++name;
+    }
+  }
+
+  /* Starting directory. */
+  int from = absolute ? ROOT_DIR_SECTOR : fs_get_pwd ();
+
+  struct thread *cur = thread_current ();
+  struct process_meta *meta = cur->meta;
+
+  char tmp[NAME_MAX + 2];
+  int sec = filesys_walk (from, name, tmp);
+  if (sec == INVALID_SECTOR) {
+    /* Fail */
+    return 0;
+  }
+
+  meta->pwd = sec;
+  return 1;
 }

@@ -26,7 +26,9 @@ int filesys_walk (int from, const char *path, char *tmp);
 int filesys_leave (int from, const char *path, char *tmp);
 
 int fs_create (const char *name, off_t initial_size);
+int fs_mkdir (const char *name, off_t initial_size);
 struct file *fs_open (const char *name);
 int fs_remove (const char *name);
+int fs_chdir (const char *name);
 
 #endif /**< filesys/filesys.h */
