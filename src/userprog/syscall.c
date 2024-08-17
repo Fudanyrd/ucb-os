@@ -467,6 +467,11 @@ static int tell_executor (void *args);
 static int close_executor (void *args);
 static int mmap_executor (void *args);
 static int munmap_executor (void *args);
+static int chdir_executor (void *args);
+static int mkdir_executor (void *args);
+static int readdir_executor (void *args);
+static int isdir_executor (void *args);
+static int inumber_executor (void *args);
 
 /** list of implemented system calls */
 static syscall_executor_t syscall_executors[] = 
@@ -486,6 +491,11 @@ static syscall_executor_t syscall_executors[] =
     [SYS_CLOSE] close_executor,
     [SYS_MMAP]  mmap_executor,
     [SYS_MUNMAP] munmap_executor,
+    [SYS_CHDIR] chdir_executor,
+    [SYS_MKDIR] mkdir_executor,
+    [SYS_READDIR] readdir_executor,
+    [SYS_ISDIR] isdir_executor,
+    [SYS_INUMBER] inumber_executor,
   };
 
 /** Number of implemented system calls(to detect overflow) */
@@ -1081,4 +1091,59 @@ munmap_executor (void *args)
   /* Execute */
   return vm_unmap (fd);  // NOT IMPLEMENTED
 #endif /**< VM */
+}
+
+static int 
+chdir_executor (void *args)
+{
+  /* Hint: bool chdir (const char *dir) */
+  struct intr_frame *f = args;
+  void *argv = syscall_args (f);
+
+  /* not implemented */
+  return 0;
+}
+
+static int 
+mkdir_executor (void *args)
+{
+  /* Hint: bool mkdir (const char *dir) */
+  struct intr_frame *f = args;
+  void *argv = syscall_args (f);
+
+  /* not implemented */
+  return 0;
+}
+
+static int 
+readdir_executor (void *args)
+{
+  /* Hint: bool readdir (int fd, char *name) */
+  struct intr_frame *f = args;
+  void *argv = syscall_args (f);
+
+  /* not implemented */
+  return 0;
+}
+
+static int 
+isdir_executor (void *args)
+{
+  /* Hint: bool isdir (int fd, char *name) */
+  struct intr_frame *f = args;
+  void *argv = syscall_args (f);
+
+  /* not implemented */
+  return 0;
+}
+
+static int 
+inumber_executor (void *args)
+{
+  /* Hint: int inumber (int fd, char *name) */
+  struct intr_frame *f = args;
+  void *argv = syscall_args (f);
+
+  /* not implemented */
+  return -1;
 }
