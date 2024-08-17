@@ -74,6 +74,9 @@ int fdfree (int);
 int fdseek (int, unsigned int);
 int fdtell (int);
 int fdsize (int);
+int fdisdir (int);
+int fdinum (int);
+int fdrddir (int fd, char *kbuf);
 struct file *filealloc (const char *fn);
 
 #endif /**< userprog/process.h */

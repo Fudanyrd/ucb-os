@@ -13,6 +13,13 @@ struct dir
     off_t pos;                          /**< Current position. */
   };
 
+/** Returns the size of a dir entry. */
+int 
+dir_entr_size (void)
+{
+  return sizeof (struct dir);
+}
+
 /** A single directory entry. */
 struct dir_entry 
   {
@@ -250,4 +257,21 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
         } 
     }
   return false;
+}
+
+/* Returns the offset of a directory. */
+int 
+dir_tell (const struct dir *dir)
+{
+  return dir->pos;
+}
+
+/* Returns true if success. */
+int
+dir_seek (struct dir *dir, int pos)
+{
+  if (dir == NULL || pos < 0)
+    return 0;
+  dir->pos = pos;
+  return 1;
 }

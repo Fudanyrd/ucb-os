@@ -1183,4 +1183,11 @@ inode_typ (const struct inode *ino)
   return ret;
 }
 
+/* Returns the unique identifier of an inode. */
+int 
+inode_num (const struct inode *ino)
+{
+  return ino->sector;
+}
+
 #endif /**< FILESYS */

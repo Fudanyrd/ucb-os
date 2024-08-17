@@ -14,6 +14,7 @@
 #include "userprog/syscall.h"
 #include "userprog/tss.h"
 #include "filesys/directory.h"
+#include "filesys/inode.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 #include "threads/flags.h"
@@ -972,4 +973,63 @@ fdsize (int fd)
   }
 
   return file_length (m->ofile[fd]);
+}
+
+/** Return 1 if fd represents a directory. */
+int 
+fdisdir (int fd)
+{
+  fd -= 2;
+  struct process_meta *m = thread_current ()->meta;
+
+  /* Validate args. */
+  if (fd < 0 || fd >= MAX_FILE || m->ofile[fd] == NULL)
+    return 0;
+  
+  /* Check inode. */
+  struct inode *ino = file_get_inode (m->ofile[fd]);
+  return inode_typ (ino) == INODE_DIR;
+}
+
+/** Return the sector number of an inode. */
+int 
+fdinum (int fd)
+{
+  fd -= 2;
+  struct process_meta *m = thread_current ()->meta;
+
+  /* Validate args. */
+  if (fd < 0 || fd >= MAX_FILE || m->ofile[fd] == NULL)
+    return 0;
+  
+  /* Check inode. */
+  struct inode *ino = file_get_inode (m->ofile[fd]);
+}
+
+/* Returns 1 if successful. */
+int 
+fdrddir (int fd, char *kbuf)
+{
+  fd -= 2;
+  struct process_meta *m = thread_current ()->meta;
+
+  /* Validate args. */
+  if (fd < 0 || fd >= MAX_FILE || m->ofile[fd] == NULL)
+    return 0;
+  
+  /* Check inode. */
+  struct inode *ino = file_get_inode (m->ofile[fd]);
+  if (inode_typ (ino) != INODE_DIR)
+    return 0;
+  
+  /* Open directory, seek to the position. */
+  struct dir *dir = dir_open (ino);
+  const int base = 2 * dir_entr_size ();
+  if (dir_tell (dir) < base)
+    dir_seek (dir, base);
+
+  int ret = dir_readdir (dir, kbuf); 
+  dir_close (dir);
+
+  return ret;
 }

@@ -16,6 +16,8 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "filesys/filesys.h"
+#include "filesys/directory.h"
 
 #ifdef VM
 #include "vm/vm-util.h"
@@ -1170,17 +1172,50 @@ readdir_executor (void *args)
   struct intr_frame *f = args;
   void *argv = syscall_args (f);
 
+  /* Parse args */
+  unsigned int bytes;
+  int fd;
+  char *uaddr;
+  struct thread *cur = thread_current ();
+  bytes = copy_from_user (cur->pagedir, argv, &fd, sizeof (fd));
+  if (bytes != sizeof (fd))
+    process_terminate (-1);
+  bytes = copy_from_user (cur->pagedir, argv + 4, &uaddr, sizeof (uaddr));
+  if (bytes != sizeof (uaddr))
+    process_terminate (-1);
+
+  /* Fill the kernel buffer */
+  char buf[NAME_MAX + 1];
+  if (!fdrddir (fd, buf))
+    goto rddir_fail;
+  
+  bytes = copy_to_user (cur->pagedir, buf, uaddr, sizeof buf, f->esp);
+  if (bytes != sizeof (buf))
+    process_terminate (-1);
+
+  return 1;
   /* not implemented */
+rddir_fail:
   return 0;
 }
 
 static int 
 isdir_executor (void *args)
 {
-  /* Hint: bool isdir (int fd, char *name) */
+  /* Hint: bool isdir (int fd) */
   struct intr_frame *f = args;
   void *argv = syscall_args (f);
 
+  /* Parse args */
+  unsigned int bytes;
+  int fd;
+  struct thread *cur = thread_current ();
+  bytes = copy_from_user (cur->pagedir, argv, &fd, sizeof (fd));
+  if (bytes != sizeof (fd))
+    process_terminate (-1);
+  
+  return fdisdir (fd);
+isdir_fail:
   /* not implemented */
   return 0;
 }
@@ -1188,10 +1223,20 @@ isdir_executor (void *args)
 static int 
 inumber_executor (void *args)
 {
-  /* Hint: int inumber (int fd, char *name) */
+  /* Hint: int inumber (int fd) */
   struct intr_frame *f = args;
   void *argv = syscall_args (f);
 
+  /* Parse args */
+  unsigned int bytes;
+  int fd;
+  struct thread *cur = thread_current ();
+  bytes = copy_from_user (cur->pagedir, argv, &fd, sizeof (fd));
+  if (bytes != sizeof (fd))
+    process_terminate (-1);
+  
+  return fdisdir (fd);
+inum_fail:
   /* not implemented */
   return -1;
 }
