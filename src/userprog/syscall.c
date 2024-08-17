@@ -626,7 +626,7 @@ create_executor (void *args)
   /** Note: syscall prototype:
     bool create (const char *file, unsigned initial_size);
    */
-  char kbuf[16];
+  char kbuf[16 * 16];
   struct thread *cur = thread_current ();
 
   /* parse args */
@@ -654,7 +654,7 @@ create_executor (void *args)
   }
 
   /* execute */
-  return (int) filesys_create (kbuf, init_sz);
+  return (int) fs_create (kbuf, init_sz);
 }
 
 static int 
