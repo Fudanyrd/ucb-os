@@ -44,9 +44,14 @@ process_execute (const char *file_name)
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
+
+  /* Child should inherit the pwd. */
+  struct thread *cur = thread_current ();
+  *(int *)fn_copy = cur->meta == NULL ? ROOT_DIR_SECTOR
+                  : ((struct process_meta *)cur->meta)->pwd;
   if (fn_copy == NULL)
     return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE);
+  strlcpy (fn_copy + 4, file_name, PGSIZE);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
@@ -55,7 +60,6 @@ process_execute (const char *file_name)
   
   /* Suspend execution of current running thread. */
   enum intr_level old_level = intr_disable ();
-  struct thread *cur = thread_current ();
   list_push_back (&exec_process, &cur->elem);
   cur->ticks = tid;
   thread_block ();
@@ -71,7 +75,8 @@ process_execute (const char *file_name)
 static void
 start_process (void *file_name_)
 {
-  char *file_name = file_name_;
+  int pwd = *(int *)file_name_;
+  char *file_name = file_name_ + 4;
   struct intr_frame if_;
   bool success;
 
@@ -82,10 +87,13 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
-  /* If load failed, quit. */
-  palloc_free_page (file_name);
-  /* Wakeup, and tell the parent it started or not. */
+  /* Inherit the cwd. */
   struct thread *cur = thread_current ();
+  ((struct process_meta *)cur->meta)->pwd = pwd;
+
+  /* If load failed, quit. */
+  palloc_free_page (file_name_);
+  /* Wakeup, and tell the parent it started or not. */
   process_unblock (&exec_process, cur->tid, success ? cur->tid : TID_ERROR);
   if (!success) 
     thread_exit ();
