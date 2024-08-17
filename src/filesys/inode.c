@@ -408,15 +408,6 @@ inode_length (const struct inode *inode)
  * cication: <https://github.com/mit-pdos/xv6-riscv/blob/riscv/kernel/fs.h> 
  */
 
-enum inode_type {
-  /**< Invalid type */
-  INODE_NULL = 0,
-  /**< File */
-  INODE_FILE,
-  /**< Directory */
-  INODE_DIR,
-};
-
 /** On-disk inode.
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
 struct inode_disk
@@ -894,14 +885,14 @@ inode_init (void)
    Returns true if successful.
    Returns false if memory or disk allocation fails. */
 bool 
-inode_create (block_sector_t sec, off_t size)
+inode_create (block_sector_t sec, off_t size, int tp)
 {
   /* Fetch and pin the sector. */
   struct inode_disk *di = bio_write (sec);
   if (di == NULL)
     return false;
 
-  di->type = INODE_FILE;
+  di->type = tp;
   di->size = size;
   /* TODO: set a reasonable nlink. */
   di->nlink = 1;

@@ -7,8 +7,18 @@
 
 struct bitmap;
 
+/**< Inode has 3 distinct types */
+enum inode_type {
+  /**< Invalid type */
+  INODE_NULL = 0,
+  /**< File */
+  INODE_FILE,
+  /**< Directory */
+  INODE_DIR,
+};
+
 void inode_init (void);
-bool inode_create (block_sector_t, off_t);
+bool inode_create (block_sector_t, off_t, int);
 struct inode *inode_open (block_sector_t);
 struct inode *inode_reopen (struct inode *);
 block_sector_t inode_get_inumber (const struct inode *);
