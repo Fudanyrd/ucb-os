@@ -133,6 +133,22 @@ dir_lookup (const struct dir *dir, const char *name,
   return *inode != NULL;
 }
 
+/** From directory loop up the sector of an entry.
+ * @return -1 if not found.
+ */
+int 
+dir_sec (const struct dir *dir, const char *name)
+{
+  struct dir_entry e;
+
+  ASSERT (dir != NULL);
+  ASSERT (name != NULL);
+
+  if (lookup (dir, name, &e, NULL))
+    return e.inode_sector;
+  return -1;
+}
+
 /** Adds a file named NAME to DIR, which must not already contain a
    file by that name.  The file's inode is in sector
    INODE_SECTOR.

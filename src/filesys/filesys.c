@@ -8,6 +8,7 @@
 #include "filesys/inode.h"
 #include "filesys/directory.h"
 #include "filesys/bio.h"
+#include "userprog/process.h"
 
 /** Partition that contains the file system. */
 struct block *fs_device;
@@ -110,4 +111,164 @@ do_format (void)
     PANIC ("root directory creation failed");
   free_map_close ();
   printf ("done.\n");
+}
+
+/** Walk down the fs tree to find the inode sector of path. 
+ * @param tmp a temp buffer of length at least NAME_MAX + 1.
+ * This will avoid stack overflow of deep recursion.
+ */
+int 
+filesys_walk (int from, const char *path, char *tmp)
+{
+  /* End recursion */
+  if (from == INVALID_SECTOR || path == NULL) {
+    return INVALID_SECTOR;
+  }
+
+  /* End recursion */
+  if (*path == '\0')
+    return from;
+  
+  /* Fetch file name. */
+  int iter = 0;
+  for (; path[iter] != '/' && path[iter] != '\0'; ++iter) {
+    tmp[iter] = path[iter];
+  }
+  /* Set terminator. */
+  tmp[iter] = '\0';
+
+  /* Skip multiple dash. */
+  for (; path[iter] == '/'; ++iter) {}
+
+  /* Open the inode, and keep recursion. */
+  struct inode *ino = inode_open (from);
+  if (inode_typ (ino) != INODE_DIR) {
+    /* Not a directory, abort. */
+    inode_close (ino);
+    return INVALID_SECTOR;
+  }
+
+  /* Open directory, and find destination. */
+  struct dir *dir = dir_open (ino);
+  from = dir_sec (dir, tmp);
+
+  /* dir_close shall close the inode too. */
+  dir_close (ino);
+
+  /* Recurse, reusing the tmp buffer. */
+  return filesys_walk (from, path + iter, tmp);
+}
+
+/** Almost the same as fs_walk. The only difference is that it does not
+ * proceed to the last file of path instead copy its name in tmp.
+ */
+int 
+filesys_leave (int from, const char *path, char *tmp)
+{
+  /* End recursion */
+  if (from == INVALID_SECTOR || path == NULL) {
+    return INVALID_SECTOR;
+  }
+
+  /* End recursion */
+  if (*path == '\0')
+    return from;
+  
+  /* Fetch file name. */
+  int iter = 0;
+  for (; path[iter] != '/' && path[iter] != '\0'; ++iter) {
+    tmp[iter] = path[iter];
+  }
+  /* Set terminator. */
+  tmp[iter] = '\0';
+
+  /* Skip multiple dash. */
+  for (; path[iter] == '/'; ++iter) {}
+
+  if (path[iter] == '\0') {
+    /* Terminate */
+    return from;
+  }
+
+  /* Continue. */
+  struct inode *ino = inode_open (from);
+  if (inode_typ (ino) != INODE_DIR) {
+    /* Not a directory, abort. */
+    inode_close (ino);
+    return INVALID_SECTOR;
+  }
+
+  /* Open directory, and find destination. */
+  struct dir *dir = dir_open (ino);
+  from = dir_sec (dir, tmp);
+
+  /* dir_close shall close the inode too. */
+  dir_close (ino);
+
+  /* Recurse, reusing the tmp buffer. */
+  return filesys_leave (from, path + iter, tmp);
+}
+
+/** Returns the current working dir of thread. */
+static int
+fs_get_pwd (void)
+{
+  struct thread *cur = thread_current ();
+  struct process_meta *meta = cur->meta;
+  ASSERT (meta != NULL);
+  return meta->pwd;
+}
+
+/* Remove a file or empty directory. */
+int 
+fs_remove (const char *name)
+{
+  /* Not implemented */
+  return 0;
+}
+
+/**  Create a file or directory, 
+ * @param name may be absolute or relative.
+ */
+int 
+fs_create (const char *name, off_t initial_size)
+{
+  int absolute = 0;
+  if (*name == '/') {
+    absolute = 1;
+    /* Abolute path. */
+    while (*name == '/') {
+      ++name;
+    }
+  }
+
+  /* Starting directory. */
+  int from = absolute ? ROOT_DIR_SECTOR : fs_get_pwd ();
+
+  /* Walk to destination */
+  char tmp[NAME_MAX + 2];  /**< buffer */
+  int dest;                /**< sector of destination */
+  dest = filesys_leave (from, name, tmp);
+
+  if (dest == INVALID_SECTOR) {
+    /* Fail */
+    return 0;
+  }
+
+  /* Open directory. */
+  struct inode *ino = inode_open (dest);
+  struct dir *dir = dir_open (ino);
+  ASSERT (ino != NULL && dir != NULL && inode_typ (ino) == INODE_DIR);
+
+  block_sector_t sec = 0;
+  int ret = (
+    free_map_allocate (1U, &sec) &&
+    inode_create (sec, initial_size, INODE_FILE) &&
+    dir_add (dir, tmp, sec)
+  );
+  if (ret == 0&& sec != 0) 
+    free_map_release (sec, 1);
+  dir_close (dir);
+
+  return ret;
 }

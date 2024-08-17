@@ -1169,4 +1169,18 @@ length_done:
   return ret;
 }
 
+/** Returns the type of an inode. */
+int 
+inode_typ (const struct inode *ino)
+{
+  ASSERT (ino->sector != INODE_INVALID);
+  const struct inode_disk *di = bio_read (ino->sector);
+  if (di->magic != INODE_MAGIC) {
+    PANIC ("not an inode");
+  }
+  int ret = di->type;
+  bio_unpin_sec (di);
+  return ret;
+}
+
 #endif /**< FILESYS */
