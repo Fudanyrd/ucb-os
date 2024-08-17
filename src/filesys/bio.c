@@ -221,7 +221,7 @@ bio_new (void)
   return pack;
 }
 
-/** Fetch a sector for reading . */
+/** Fetch a sector for reading and pin the page. */
 const char *
 bio_read (block_sector_t sec)
 {
@@ -234,17 +234,23 @@ bio_read (block_sector_t sec)
     return NULL;
   }
 
+  /* Help you pin the page. */
+  bmeta[line].pin_cnt++;
   lock_release (&bplock);
   return bio_base + (BLOCK_SECTOR_SIZE * line);
 }
 
-/** Fetch a sector for writing. */
+/** Fetch a sector for writing and pin it. */
 char *
 bio_write (block_sector_t sec)
 {
   lock_acquire (&bplock);
   ++bio_ticks;
   int line = bio_fetch (sec, 1);
+
+  /* Help you pin the page. */
+  if (line >= 0)
+    bmeta[line].pin_cnt++;
   lock_release (&bplock);
   return line < 0 ? NULL : bio_base + (line * BLOCK_SECTOR_SIZE);
 }
