@@ -571,6 +571,9 @@ load (char *file_name, void (**eip) (void), void **esp)
 
   /** Exercise 5.1: deny write to executable */
   mpt->executable = file;
+
+  /** Initial working directory.  */
+  mpt->pwd = ROOT_DIR_SECTOR;
 #ifdef TEST
   printf ("allocate block %x for meta\n", mpt);
 #endif

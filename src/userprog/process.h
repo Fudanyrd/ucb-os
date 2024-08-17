@@ -4,6 +4,7 @@
 #include "mode.h"
 #include "threads/thread.h"
 #include "threads/palloc.h"
+#include "filesys/filesys.h"
 
 #ifdef VM
 #include "vm/vm-util.h"
@@ -40,6 +41,7 @@ struct process_meta
     struct file    *ofile[MAX_FILE];
                                 /**< File descriptor table */
     struct file    *executable; /**< Executable; must close on process_exit. */
+    int             pwd;        /**< Present working directory */
 #ifdef VM  /**< Virtual memory is implemented! */
     void           *map_file_rt;     /**< Root of file mapping table. */
     struct swap_table_root *swaptb;  /**< Swap table */
