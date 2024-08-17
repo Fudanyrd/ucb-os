@@ -471,9 +471,6 @@ inode_deallocate (struct inode *ino)
   if (di == NULL) {
     PANIC ("buffer full");
   }
-  if (!bio_pin_sec (di)) {
-    PANIC ("pin sec");
-  }
 
   /* For each direct page, destroy */
   for (int i = 0; i < 123; ++i)
@@ -487,8 +484,6 @@ inode_deallocate (struct inode *ino)
   if (di->addrs[123] != INODE_INVALID)
     {
       const struct indirect_block *ind = bio_read (di->addrs[123]);
-      if (!bio_pin_sec (ind))
-        PANIC ("bio pin");
       for (int i = 0; i < 128; ++i) {
         if (ind->addrs[i] != INODE_INVALID)
           free_map_release (ind->addrs[i], 1U);
@@ -503,8 +498,6 @@ inode_deallocate (struct inode *ino)
   if (di->addrs[124] != INODE_INVALID)
     {
       const struct indirect_block *first = bio_read (di->addrs[124]);
-      if (!bio_pin_sec (first))
-        PANIC ("bio pin");
       const struct indirect_block *second;
 
       for (int i = 0; i < 128; ++i) {
@@ -512,8 +505,6 @@ inode_deallocate (struct inode *ino)
           continue;
         
         second = bio_read (first->addrs[i]);
-        if (!bio_pin_sec (second))
-          PANIC ("bio pin");
 
         for (int k = 0; k < 128; ++k) {
           if (second->addrs[k] != INODE_INVALID)
@@ -555,9 +546,6 @@ static off_t
 inode_seek_read (const struct inode_disk *di, char *buf, off_t offset, 
                  off_t size)
 {
-  if (di->magic != INODE_MAGIC) {
-    PANIC ("not inode_disk");
-  }
 
   if (offset >= MAXFILE) /* Seek beyond largest file */
     return 0;  
@@ -584,8 +572,6 @@ inode_seek_read (const struct inode_disk *di, char *buf, off_t offset,
 
     /* Fetch the data sector and pin it. */
     const char *dat = bio_read (dsec);
-    if (!bio_pin_sec (dat))
-      PANIC ("bio pin");
 
     /* Copy the bytes */
     memcpy (buf, dat + sec_off (offset), bytes);
@@ -600,8 +586,6 @@ inode_seek_read (const struct inode_disk *di, char *buf, off_t offset,
   offset -= DIRECT_SIZE;
   if (offset < SINGLE_INDIR_SIZE) {
     const struct indirect_block *indir = bio_read (di->addrs[123]);
-    if (!bio_pin_sec (indir))
-      PANIC ("bio pin");
     /* Get data sector */
     int dsec = indir->addrs[offset / BLOCK_SECTOR_SIZE];
     if (!bio_unpin_sec (indir))
@@ -620,8 +604,6 @@ inode_seek_read (const struct inode_disk *di, char *buf, off_t offset,
     
     /* Read data in sector dsec. */
     const char *dat = bio_read (dsec);
-    if (!bio_pin_sec (dat))
-      PANIC ("bio pin");
     memcpy (buf, dat + sec_off (offset), bytes);
     if (!bio_unpin_sec (dat))
       PANIC ("bio unpin");
@@ -640,9 +622,6 @@ inode_seek_read (const struct inode_disk *di, char *buf, off_t offset,
 
   /* pin first level directory block, read and unpin. */
   const struct indirect_block *isec1 = bio_read (di->addrs[124]);
-  if (!bio_pin_sec (isec1)) {
-    PANIC ("bio pin");
-  }
   const int isec2id = isec1->addrs[ind1];
   if (!bio_unpin_sec (isec1)) {
     PANIC ("bio unpin");
@@ -653,9 +632,6 @@ inode_seek_read (const struct inode_disk *di, char *buf, off_t offset,
 
   /* pin second level directory block, read and unpin. */
   const struct indirect_block *isec2 = bio_read (isec2id); 
-  if (!bio_pin_sec (isec2)) {
-    PANIC ("bio pin");
-  }
   const int dsec = isec2->addrs[ind2];
   if (!bio_unpin_sec (isec2)) {
     PANIC ("bio unpin");
@@ -666,9 +642,6 @@ inode_seek_read (const struct inode_disk *di, char *buf, off_t offset,
 
   /* pin data block, read and unpin. */
   const char *idat = bio_read (dsec);
-  if (!bio_pin_sec (idat)) {
-    PANIC ("bio pin");
-  }
   memcpy (buf, idat + sec_off (offset), bytes);
   if (!bio_unpin_sec (idat)) {
     PANIC ("bio unpin");
@@ -680,6 +653,144 @@ inode_seek_read (const struct inode_disk *di, char *buf, off_t offset,
 sec_not_found: /* Sector not found, fill with zero. */
   memset (buf, 0, bytes);
   return bytes;
+}
+
+/** Initialize an indirect block. */
+static inline void
+indirect_block_init (struct indirect_block *ind)
+{
+  for (int i = 0; i < 128; ++i) {
+    ind->addrs[i] = INODE_INVALID; 
+  }
+}
+
+/** Write to a singly indirect block.
+ * @param sec sector of the singly indirect block, INODE_INVALID if
+ * need to be allocated. 
+ * @param buf buffer
+ * @param offset offset in the singly indirect block
+ * @param size maximum number of bytes to write
+ * @return number of bytes read
+ */
+static off_t
+single_indir_write (int *sec, const char *buf, off_t offset, off_t size)
+{
+  const off_t sec_of = sec_off (offset);
+  /* bytes = min(bytes, size); */
+  const off_t bytes = (size >= (BLOCK_SECTOR_SIZE - sec_of)) 
+                    ? (BLOCK_SECTOR_SIZE - sec_of) : size;
+  /* Validate parameters. */
+  ASSERT (sec != NULL && buf != NULL);
+  ASSERT (offset < SINGLE_INDIR_SIZE && offset >= 0);
+  struct indirect_block *ind = NULL;
+
+  /* Check and test the indirect sector. */
+  if (*sec == INODE_INVALID) {
+    /* Allocate */
+    if (!free_map_allocate (1U, sec)) {
+      /* Fail */
+      return 0;
+    }
+    /* Fetch and pin. */
+    ind = bio_write (*sec);
+
+    /* initialize */
+    indirect_block_init (ind);
+  }
+
+  /* fetch and pin indirect sec */
+  if (ind == NULL) {
+    ind = bio_write (*sec);
+  }
+
+  /* index into indirect sec */
+  const int idx = offset / BLOCK_SECTOR_SIZE;
+  char *dat = NULL;
+
+  /* If data sector does not present */
+  if (ind->addrs[idx] == INODE_INVALID) {
+    if (!free_map_allocate (1U, &ind->addrs[idx])) {
+      /* disk full, return. */
+      if (!bio_unpin_sec (ind))
+        PANIC ("bio unpin");
+      return 0;
+    }
+
+    dat = bio_write (ind->addrs[idx]);
+    
+    /* Set proper bytes to zero. */
+    if (sec_of != 0)
+      memset (dat, 0, sec_of);
+    memcpy (dat + sec_of, buf, bytes);
+    int of = bytes + sec_of;
+    if (of < BLOCK_SECTOR_SIZE) {
+      memset (dat + of, 0, BLOCK_SECTOR_SIZE - of);
+    }
+
+    /* Finish */
+    if (!bio_unpin_sec (dat))
+      PANIC ("bio unpin");
+    if (!bio_unpin_sec (ind))
+      PANIC ("bio unpin");
+    return bytes;
+  }
+
+  dat = bio_write (ind->addrs[idx]);
+  memcpy (dat + sec_of, buf, bytes);
+
+  /* Finish. */
+  if (!bio_unpin_sec (dat))
+    PANIC ("bio unpin");
+  if (!bio_unpin_sec (ind))
+    PANIC ("bio unpin");
+  return bytes;
+}
+
+/** Write to a doubly indirect block.
+ * @param sec sector of the doubly indirect block, INODE_INVALID if
+ * need to be allocated. 
+ * @param buf buffer
+ * @param offset offset in the singly indirect block
+ * @param size maximum number of bytes to write
+ * @return number of bytes read
+ */
+static off_t
+double_indir_write (int *sec, const char *buf, off_t offset, off_t size)
+{
+  const off_t sec_of = sec_off (offset);
+  /* bytes = min(bytes, size); */
+  const off_t bytes = (size >= (BLOCK_SECTOR_SIZE - sec_of)) 
+                    ? (BLOCK_SECTOR_SIZE - sec_of) : size;
+  ASSERT (sec != NULL && buf != NULL);
+  ASSERT (offset >= 0);
+  struct indirect_block *ind = NULL;
+
+  /* Check and pin the indirect sector. */
+  if (*sec == INODE_INVALID) {
+    if (!free_map_allocate (1U, sec)) {
+      /* Fail */
+      return 0;
+    }
+
+    ind = bio_write (*sec);
+    indirect_block_init (ind);
+  }
+
+  if (ind == NULL) {
+    ind = bio_write (*sec);
+  }
+
+  /* Index into the singly indirect sector. */
+  const int idx = offset / SINGLE_INDIR_SIZE;
+
+  /* Perform write */
+  const off_t ret = single_indir_write (&ind->addrs[idx], buf, 
+                                        offset % SINGLE_INDIR_SIZE, size);
+  
+  /* Finish. */
+  if (!bio_unpin_sec (ind))
+    PANIC ("bio unpin");
+  return ret;
 }
 
 /** Seek and read a page into buffer. 
@@ -696,9 +807,6 @@ inode_seek_write (struct inode_disk *di, const char *buf, off_t offset,
   if (offset >= MAXFILE) {
     /* Cannot write outside of maxfile. */
     return 0;
-  }
-  if (di->magic != INODE_MAGIC) {
-    PANIC ("not inode_disk");
   }
   const off_t sec_of = sec_off (offset);
   /* bytes = min(bytes, size); */
@@ -724,9 +832,6 @@ inode_seek_write (struct inode_disk *di, const char *buf, off_t offset,
 
     /* fetch the page and write. */
     char *dat = bio_write (di->addrs[isec]);
-    if (!bio_pin_sec (dat)) {
-      PANIC ("bio pin");
-    }
     memcpy (dat + sec_of, buf, bytes);
     if (!bio_unpin_sec (dat)) {
       PANIC ("bio unpin");
@@ -738,13 +843,11 @@ inode_seek_write (struct inode_disk *di, const char *buf, off_t offset,
   /* Then try single indirect block. */
   offset -= DIRECT_SIZE;
   if (offset < SINGLE_INDIR_SIZE) {
-    PANIC ("not implemented");
+    return single_indir_write (&di->addrs[123], buf, offset, size);
   }
 
   /* Then try doubly indirect block */
-  PANIC ("not implemented");
-
-  return bytes;
+  return double_indir_write (&di->addrs[124], buf, offset, size);
 }
 
 /** List of open inodes, so that opening a single inode twice
@@ -789,9 +892,6 @@ inode_create (block_sector_t sec, off_t size)
   struct inode_disk *di = bio_write (sec);
   if (di == NULL)
     return false;
-  if (!bio_pin_sec (di)) {
-    PANIC ("inode_create pin");
-  }
 
   di->type = INODE_FILE;
   di->size = size;
@@ -936,8 +1036,11 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
 
   /* Fetch and pin the page(DO NOT WRITE inode->data) */
   const struct inode_disk *sec = bio_read (inode->sector);
-  if (!bio_pin_sec (sec))
-    PANIC ("bio pin");
+  
+  /* Verify magic number. */
+  if (sec->magic != INODE_MAGIC) {
+    PANIC ("not inode_disk");
+  }
 
   /** Hint: enter critical section */
   lock_acquire (&inode->lk);
@@ -956,6 +1059,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
     offset += bread;
     buffer += bread;
     size -= bread;
+    bytes_read += bread;
   }
 
   /* Done. */
@@ -975,8 +1079,42 @@ off_t
 inode_write_at (struct inode *inode, const void *buffer_, off_t size,
                 off_t offset) 
 {
-  /* Not implemented. */
-  return 0;
+  off_t bytes_wrt = 0;
+  if (offset >= MAXFILE)
+    return 0;
+
+  /* Acquire the inode lock. */
+  lock_acquire (&inode->lk);
+
+  /* Fetch and pin inode_disk. */
+  struct inode_disk *di = bio_write (inode->sector);
+  
+  /* Verify magic number. */
+  if (di->magic != INODE_MAGIC) {
+    PANIC ("not inode_disk");
+  }
+
+  while (size >= 0) {
+    const off_t bwrt = inode_seek_write (di, buffer_, offset, size);
+    ASSERT (bwrt <= size);
+    if (bwrt == 0) /* Disk full, abort */
+      break;
+    
+    /* Advance */
+    bytes_wrt += bwrt;
+    size -= bwrt;
+    buffer_ += bwrt;
+    offset += bwrt;
+  }
+
+  /* Update the size of file. */
+  di->size = offset > di->size ? offset : di->size;
+  
+wrt_done:
+  if (!bio_unpin_sec (di))
+    PANIC ("bio unpin");
+  lock_release (&inode->lk);
+  return bytes_wrt;
 }
 
 /** Disables writes to INODE.
@@ -1013,8 +1151,6 @@ inode_length (const struct inode *inode)
   /* Create critical section */
   lock_acquire (&inode->lk);
   const struct inode_disk *di = bio_read (inode->sector);
-  if (!bio_pin_sec (di))
-    PANIC ("bio pin");
 
   /* read the size data */ 
   if (di->magic != INODE_MAGIC)
