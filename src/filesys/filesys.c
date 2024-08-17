@@ -272,3 +272,41 @@ fs_create (const char *name, off_t initial_size)
 
   return ret;
 }
+
+/** Open a file considering relative path name */
+struct file *
+fs_open (const char *name)
+{
+  int absolute = 0;
+  if (*name == '/') {
+    absolute = 1;
+    /* Abolute path. */
+    while (*name == '/') {
+      ++name;
+    }
+  }
+
+  /* Starting directory. */
+  int from = absolute ? ROOT_DIR_SECTOR : fs_get_pwd ();
+
+  /* Walk directly to the file. */
+  char tmp[NAME_MAX + 2];
+  int dest;                /**< sector of destination */
+  dest = filesys_leave (from, name, tmp);
+
+  if (dest == INVALID_SECTOR) {
+    /* Fail */
+    return NULL;
+  }
+
+  /* Open directory. */
+  struct inode *ino = inode_open (dest);
+  struct dir *dir = dir_open (ino);
+  ASSERT (ino != NULL && dir != NULL && inode_typ (ino) == INODE_DIR);
+
+  struct inode *ret;
+  dir_lookup (dir, tmp, &ret);
+  dir_close (dir);
+
+  return file_open (ret);
+}

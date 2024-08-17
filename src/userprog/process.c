@@ -889,7 +889,7 @@ fdalloc (void)
 struct file *
 filealloc (const char *fn)
 {
-  struct file *ret = filesys_open (fn);
+  struct file *ret = fs_open (fn);
   return ret;
 }
 
