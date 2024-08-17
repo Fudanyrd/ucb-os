@@ -585,17 +585,23 @@ inode_seek_read (const struct inode_disk *di, char *buf, off_t offset,
   /* Look into singly indirect sectors. */
   offset -= DIRECT_SIZE;
   if (offset < SINGLE_INDIR_SIZE) {
+    /* bytes to be read. */
+    off_t bytes = BLOCK_SECTOR_SIZE - sec_off (offset);
+    /* bytes = min(size, bytes); */
+    bytes = bytes > size ? size : bytes;
+
+    if (di->addrs[123] == INODE_INVALID) {
+      /* Not found. */
+      memset (buf, 0, bytes);
+      return bytes;
+    }
+
     const struct indirect_block *indir = bio_read (di->addrs[123]);
     /* Get data sector */
     int dsec = indir->addrs[offset / BLOCK_SECTOR_SIZE];
     if (!bio_unpin_sec (indir))
       PANIC ("bio unpin");
     
-    /* bytes to be read. */
-    off_t bytes = BLOCK_SECTOR_SIZE - sec_off (offset);
-    /* bytes = min(size, bytes); */
-    bytes = bytes > size ? size : bytes;
-
     /* validate dsec */
     if (dsec == INODE_INVALID) {
       memset (buf, 0, bytes);
@@ -621,6 +627,8 @@ inode_seek_read (const struct inode_disk *di, char *buf, off_t offset,
   ASSERT (ind1 < 128 && ind2 < 128);
 
   /* pin first level directory block, read and unpin. */
+  if (di->addrs[124] == INODE_INVALID)
+    goto sec_not_found;
   const struct indirect_block *isec1 = bio_read (di->addrs[124]);
   const int isec2id = isec1->addrs[ind1];
   if (!bio_unpin_sec (isec1)) {
@@ -1085,6 +1093,12 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
   /* Acquire the inode lock. */
   lock_acquire (&inode->lk);
+
+  /* check allow write. */
+  if (inode->deny_write_cnt > 0) {
+    lock_release (&inode->lk);
+    return 0;
+  }
 
   /* Fetch and pin inode_disk. */
   struct inode_disk *di = bio_write (inode->sector);
