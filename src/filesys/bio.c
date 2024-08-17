@@ -222,8 +222,8 @@ bio_new (void)
 }
 
 /** Fetch a sector for reading and pin the page. */
-const char *
-bio_read (block_sector_t sec)
+static const char *
+bio_read_exec (block_sector_t sec)
 {
   lock_acquire (&bplock);
   ++bio_ticks;
@@ -240,9 +240,19 @@ bio_read (block_sector_t sec)
   return bio_base + (BLOCK_SECTOR_SIZE * line);
 }
 
+/** Fetch a sector for reading and pin the page. */
+const char *
+bio_read (block_sector_t sec) 
+{
+  const char *ret = bio_read_exec (sec);
+  if (ret == NULL)
+    PANIC ("buffer full");
+  return ret;
+}
+
 /** Fetch a sector for writing and pin it. */
-char *
-bio_write (block_sector_t sec)
+static char *
+bio_write_exec (block_sector_t sec)
 {
   lock_acquire (&bplock);
   ++bio_ticks;
@@ -255,10 +265,21 @@ bio_write (block_sector_t sec)
   return line < 0 ? NULL : bio_base + (line * BLOCK_SECTOR_SIZE);
 }
 
+/** Fetch a sector for writing and pin it. */
+char *
+bio_write (block_sector_t sec)
+{
+  char *ret = bio_write_exec (sec);
+  if (ret == NULL)
+    PANIC ("buffer full");
+  return ret;
+}
+
 /** Flush all dirty pages back to disk. */
 void 
 bio_flush (void)
 {
+  free_map_flush ();
   char *pt = bio_base;
   lock_acquire (&bplock);
   for (int i = 0; i < BIO_CACHE; ++i)
