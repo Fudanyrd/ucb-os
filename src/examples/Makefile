@@ -6,7 +6,7 @@ SRCDIR = ..
 PROGS = cat cmp cp crrm echo exit fio fio2 halt hang hex-dump \
   ls mcat mcp mkdir pwd rm shell \
 	bubsort insult lineup matmult recursor parrot telseek \
-	zombie big_array big_stack
+	zombie big_array big_stack debug
 
 # Should work from project 2 onward.
 cat_SRC = cat.c
@@ -41,6 +41,9 @@ mcp_SRC = mcp.c
 mkdir_SRC = mkdir.c
 pwd_SRC = pwd.c
 shell_SRC = shell.c
+
+# debug helper
+debug_SRC = debug.c
 
 include $(SRCDIR)/Make.config
 include $(SRCDIR)/Makefile.userprog
