@@ -846,6 +846,7 @@ inode_seek_write (struct inode_disk *di, const char *buf, off_t offset,
   }
 
   /* Then try doubly indirect block */
+  offset -= SINGLE_INDIR_SIZE;
   return double_indir_write (&di->addrs[124], buf, offset, size);
 }
 
