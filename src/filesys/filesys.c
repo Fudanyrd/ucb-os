@@ -44,8 +44,9 @@ filesys_init (bool format)
 void
 filesys_done (void) 
 {
-  bio_flush ();
+  free_map_flush ();
   free_map_close ();
+  bio_flush ();
 }
 
 /** Creates a file named NAME with the given INITIAL_SIZE.
@@ -218,8 +219,7 @@ fs_get_pwd (void)
 {
   struct thread *cur = thread_current ();
   struct process_meta *meta = cur->meta;
-  ASSERT (meta != NULL);
-  return meta->pwd;
+  return meta == NULL ? ROOT_DIR_SECTOR : meta->pwd;
 }
 
 /* Remove a file or empty directory. */

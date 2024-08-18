@@ -1027,11 +1027,16 @@ fdrddir (int fd, char *kbuf)
   
   /* Open directory, seek to the position. */
   struct dir *dir = dir_open (inode_reopen (ino));
-  const int base = 2 * dir_entr_size ();
-  if (dir_tell (dir) < base)
+  const int base = 0;
+  int pos = file_tell (m->ofile[fd]);
+  ASSERT (pos % dir_entr_size () == 0);
+  if (pos < base)
     dir_seek (dir, base);
+  else
+    dir_seek (dir, pos);
 
   int ret = dir_readdir (dir, kbuf); 
+  file_seek (m->ofile[fd], dir_tell (dir));
   dir_close (dir);
 
   return ret;

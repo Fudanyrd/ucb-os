@@ -13,13 +13,6 @@ struct dir
     off_t pos;                          /**< Current position. */
   };
 
-/** Returns the size of a dir entry. */
-int 
-dir_entr_size (void)
-{
-  return sizeof (struct dir);
-}
-
 /** A single directory entry. */
 struct dir_entry 
   {
@@ -27,6 +20,13 @@ struct dir_entry
     char name[NAME_MAX + 1];            /**< Null terminated file name. */
     bool in_use;                        /**< In use or free? */
   };
+
+/** Returns the size of a dir entry. */
+int 
+dir_entr_size (void)
+{
+  return sizeof (struct dir_entry);
+}
 
 /** Creates a directory with space for ENTRY_CNT entries in the
    given SECTOR.  Returns true if successful, false on failure. */
@@ -250,7 +250,7 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
   while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e) 
     {
       dir->pos += sizeof e;
-      if (e.in_use)
+      if (e.in_use && strcmp (e.name, "..") && strcmp (e.name, "."))
         {
           strlcpy (name, e.name, NAME_MAX + 1);
           return true;

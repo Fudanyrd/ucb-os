@@ -279,7 +279,6 @@ bio_write (block_sector_t sec)
 void 
 bio_flush (void)
 {
-  free_map_flush ();
   char *pt = bio_base;
   lock_acquire (&bplock);
   for (int i = 0; i < BIO_CACHE; ++i)
