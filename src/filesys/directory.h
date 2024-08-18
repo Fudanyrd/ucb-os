@@ -32,5 +32,6 @@ bool dir_readdir (struct dir *, char name[NAME_MAX + 1]);
 int dir_tell (const struct dir *dir);
 int dir_seek (struct dir *dir, int pos);
 int dir_entr_size (void);
+bool dir_empty (const struct dir *dir);
 
 #endif /**< filesys/directory.h */

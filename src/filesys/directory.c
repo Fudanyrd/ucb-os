@@ -275,3 +275,20 @@ dir_seek (struct dir *dir, int pos)
   dir->pos = pos;
   return 1;
 }
+
+/** Returns true if dir is empty(i.e. only have . and ..) */
+bool 
+dir_empty (const struct dir *dir)
+{
+  struct dir_entry e;
+  int pos = 2 * sizeof (e);
+
+  while (inode_read_at (dir->inode, &e, sizeof e, pos) == sizeof e)
+    {
+      if (e.in_use)
+        return false;
+      pos += sizeof e;
+    }
+  
+  return true;
+}
