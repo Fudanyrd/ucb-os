@@ -706,7 +706,7 @@ open_executor (void *args)
   struct intr_frame *f = args;
   void *argv = syscall_args (f);
 
-  char kbuf[16];  /**< file name is at most 14 bytes */
+  char kbuf[16 * 16];  /**< file name is at most 14 bytes */
   struct thread *cur = thread_current ();
   int ret;
 
