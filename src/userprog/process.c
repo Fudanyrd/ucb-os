@@ -1004,6 +1004,8 @@ fdinum (int fd)
   
   /* Check inode. */
   struct inode *ino = file_get_inode (m->ofile[fd]);
+
+  return inode_num (ino);
 }
 
 /* Returns 1 if successful. */
@@ -1019,11 +1021,12 @@ fdrddir (int fd, char *kbuf)
   
   /* Check inode. */
   struct inode *ino = file_get_inode (m->ofile[fd]);
-  if (inode_typ (ino) != INODE_DIR)
+  if (inode_typ (ino) != INODE_DIR) {
     return 0;
+  }
   
   /* Open directory, seek to the position. */
-  struct dir *dir = dir_open (ino);
+  struct dir *dir = dir_open (inode_reopen (ino));
   const int base = 2 * dir_entr_size ();
   if (dir_tell (dir) < base)
     dir_seek (dir, base);

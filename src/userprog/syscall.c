@@ -668,7 +668,7 @@ remove_executor (void *args)
 
   /** Note of syscall prototypes:
     bool remove (const char *file); */
-  char kbuf[16];
+  char kbuf[16 * 16];
   struct thread *cur = thread_current ();
 
   /* parse args */
@@ -695,7 +695,7 @@ remove_executor (void *args)
   }
 
   /* execute */
-  return filesys_remove (kbuf) ? 1 : 0;
+  return fs_remove (kbuf);
 }
 
 /** Returns file descriptor if success; -1 on failure */
@@ -1235,7 +1235,7 @@ inumber_executor (void *args)
   if (bytes != sizeof (fd))
     process_terminate (-1);
   
-  return fdisdir (fd);
+  return fdinum (fd);
 inum_fail:
   /* not implemented */
   return -1;
