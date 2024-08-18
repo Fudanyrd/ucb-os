@@ -1,0 +1,11 @@
+make tests/filesys/extended/grow-create.result
+make tests/filesys/extended/grow-dir-lg.result
+make tests/filesys/extended/grow-file-size.result
+make tests/filesys/extended/grow-root-lg.result
+make tests/filesys/extended/grow-root-sm.result
+make tests/filesys/extended/grow-seq-lg.result
+make tests/filesys/extended/grow-seq-sm.result
+make tests/filesys/extended/grow-sparse.result
+make tests/filesys/extended/grow-tell.result
+make tests/filesys/extended/grow-two-files.result
+make tests/filesys/extended/syn-rw.result

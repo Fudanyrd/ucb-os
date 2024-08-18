@@ -1152,6 +1152,8 @@ inode_length (const struct inode *inode)
 {
   ASSERT (inode != NULL);
   off_t ret = 0;
+  if (inode->removed)
+    return ret;
 
   /* Create critical section */
   lock_acquire (&inode->lk);
@@ -1174,11 +1176,24 @@ int
 inode_typ (const struct inode *ino)
 {
   ASSERT (ino->sector != INODE_INVALID);
+  if (ino->removed)
+    return INODE_NULL;
   const struct inode_disk *di = bio_read (ino->sector);
   if (di->magic != INODE_MAGIC) {
-    PANIC ("not an inode");
+    /* Not an inode, probably a removed inode. */
+    return INODE_NULL;
   }
   int ret = di->type;
+  bio_unpin_sec (di);
+  return ret;
+}
+
+/** Returns 1 if inode points to a file. */
+int 
+inode_is_file (const struct inode *ino)
+{
+  const struct inode_disk *di = bio_read (ino->sector);
+  int ret = di->type == INODE_FILE && di->magic == INODE_MAGIC;
   bio_unpin_sec (di);
   return ret;
 }

@@ -226,8 +226,63 @@ fs_get_pwd (void)
 int 
 fs_remove (const char *name)
 {
+  int absolute = 0;
+  if (*name == '/') {
+    absolute = 1;
+    /* Abolute path. */
+    while (*name == '/') {
+      ++name;
+    }
+  }
+
+  /* Starting directory. */
+  int from = absolute ? ROOT_DIR_SECTOR : fs_get_pwd ();
+
+  /* Walk to the last but two file. */
+  char tmp[NAME_MAX + 2];  /**< buffer */
+  int dest;                /**< sector of destination */
+  tmp[0] = '\x00';
+  dest = filesys_leave (from, name, tmp);
+
+  /* Check is root dir(must fail). */
+  if (dest == ROOT_DIR_SECTOR && tmp[0] == '\x0')
+    return 0;
+
+  /* Lookup the file to delete */
+  struct inode *ino = inode_open (dest);
+  if (ino == NULL || inode_typ (ino) != INODE_DIR) {
+    inode_close (ino);
+    return 0;
+  }
+  struct dir *dir = dir_open (ino);
+  ASSERT (dir != NULL);
+
+  struct inode *del;  /* Inode to be deleted. */
+  if (!dir_lookup (dir, tmp, &del)) {
+    dir_close (dir);
+    return 0;
+  }
+
+  int ret = 0;
+  switch (inode_typ (del)) {
+    case INODE_FILE: {
+      ret = dir_remove (dir, tmp);
+      inode_close (del);
+      break;
+    }
+    case INODE_DIR: {
+      struct dir *rmd = dir_open (del);
+      int empty = dir_empty (rmd);
+      ret = empty && dir_remove (dir, tmp);
+      dir_close (rmd);
+      break;
+    }
+    default: PANIC ("invalid inode type");
+  }
+
+  dir_close (dir);
   /* Not implemented */
-  return 0;
+  return ret;
 }
 
 /**  Create a file or directory, 
@@ -260,8 +315,12 @@ fs_create (const char *name, off_t initial_size)
 
   /* Open directory. */
   struct inode *ino = inode_open (dest);
+  if (ino == NULL || inode_typ (ino) != INODE_DIR) {
+    inode_close (ino);
+    return 0;
+  }
   struct dir *dir = dir_open (ino);
-  ASSERT (ino != NULL && dir != NULL && inode_typ (ino) == INODE_DIR);
+  ASSERT (dir != NULL);
 
   block_sector_t sec = 0;
   int ret = (
@@ -304,8 +363,12 @@ fs_mkdir (const char *name, off_t initial_size)
 
   /* Open directory. */
   struct inode *ino = inode_open (dest);
+  if (ino == NULL || inode_typ (ino) != INODE_DIR) {
+    inode_close (ino);
+    return 0;
+  }
   struct dir *dir = dir_open (ino);
-  ASSERT (ino != NULL && dir != NULL && inode_typ (ino) == INODE_DIR);
+  ASSERT (dir != NULL);
 
   block_sector_t sec = 0;
   int ret = (
@@ -336,6 +399,10 @@ fs_mkdir (const char *name, off_t initial_size)
 struct file *
 fs_open (const char *name)
 {
+  /* Empty file name */
+  if (*name == '\0')
+    return NULL;
+
   int absolute = 0;
   if (*name == '/') {
     absolute = 1;
@@ -351,6 +418,7 @@ fs_open (const char *name)
   /* Walk directly to the file. */
   char tmp[NAME_MAX + 2];
   int dest;                /**< sector of destination */
+  tmp[0] = '\0';
   dest = filesys_leave (from, name, tmp);
 
   if (dest == INVALID_SECTOR) {
@@ -360,11 +428,20 @@ fs_open (const char *name)
 
   /* Open directory. */
   struct inode *ino = inode_open (dest);
+  if (ino == NULL || inode_typ (ino) != INODE_DIR) {
+    inode_close (ino);
+    return NULL;
+  }
   struct dir *dir = dir_open (ino);
-  ASSERT (ino != NULL && dir != NULL && inode_typ (ino) == INODE_DIR);
+  ASSERT (dir != NULL);
 
   struct inode *ret;
-  dir_lookup (dir, tmp, &ret);
+  ret = NULL;
+  if (tmp[0] == '\0') {
+    ret = inode_reopen (ino);
+  } else {
+    dir_lookup (dir, tmp, &ret);
+  }
   dir_close (dir);
 
   return file_open (ret);
