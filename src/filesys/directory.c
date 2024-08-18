@@ -281,11 +281,11 @@ bool
 dir_empty (const struct dir *dir)
 {
   struct dir_entry e;
-  int pos = 2 * sizeof (e);
+  int pos = 0;
 
   while (inode_read_at (dir->inode, &e, sizeof e, pos) == sizeof e)
     {
-      if (e.in_use)
+      if (e.in_use && strcmp (e.name, "..") && strcmp (e.name, "."))
         return false;
       pos += sizeof e;
     }
