@@ -4,11 +4,11 @@
 
 >Fill in your name and email address.
 
-FirstName LastName <email@domain.example>
+Rundong Yang <3096842671@qq.com>
 
 >If you have any preliminary comments on your submission, notes for the TAs, please give them here.
 
-
+We claim to get **91.8** points for testing out of 100 in this project.
 
 >Please cite any offline or online sources you consulted while preparing your submission, other than the Pintos documentation, course text, lecture notes, and course staff.
 
